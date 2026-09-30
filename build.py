@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Inline local styles, scripts and the logo into one offline HTML file. Python 3.9+."""
+from pathlib import Path
+import argparse
+import base64
+import re
+
+
+def build(destination: Path) -> Path:
+    root = Path(__file__).resolve().parent
+    html = (root / 'index.html').read_text(encoding='utf-8')
+    stylesheet = (root / 'styles.css').read_text(encoding='utf-8')
+    logo = base64.b64encode((root / 'assets/zhixiang-logo.png').read_bytes()).decode('ascii')
+    stylesheet = stylesheet.replace(
+        'url("assets/zhixiang-logo.png")',
+        f'url("data:image/png;base64,{logo}")',
+    )
+    html = re.sub(
+        r'<link rel="stylesheet" href="styles\.css(?:\?[^\"]*)?">',
+        lambda _: '<style>\n' + stylesheet + '\n</style>',
+        html,
+    )
+    for filename in ('geometry.js', 'physics.js', 'app.js'):
+        source = (root / filename).read_text(encoding='utf-8')
+        if '</script>' in source.lower():
+            raise ValueError(f'{filename} contains a closing script tag; escape it before inlining.')
+        html = re.sub(
+            rf'<script src="{re.escape(filename)}(?:\?[^\"]*)?"></script>',
+            lambda _: '<script>\n' + source + '\n</script>',
+            html,
+        )
+    support_qr = root / 'assets' / 'support-qr.jpg'
+    if support_qr.is_file():
+        qr = base64.b64encode(support_qr.read_bytes()).decode('ascii')
+        html = html.replace('assets/support-qr.jpg', f'data:image/jpeg;base64,{qr}')
+    else:
+        html = html.replace('assets/support-qr.jpg', '')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(html, encoding='utf-8')
+    return destination
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, default=Path(__file__).resolve().parent / 'standalone.html')
+    args = parser.parse_args()
+    result = build(args.output)
+    print(f'Built {result} ({result.stat().st_size:,} bytes)')

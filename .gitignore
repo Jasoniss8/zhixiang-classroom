@@ -1,0 +1,22 @@
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+qa/
+.env
+.env.*
+!.env.example
+
+# Local verification and editor state
+.playwright-cli/
+output/
+.sites-runtime/
+.wrangler/
+
+# Generated pages and personal deployment material
+standalone.html
+dist/
+assets/support-qr.jpg
+.openai/

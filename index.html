@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#16775c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2040%2040%22%3E%3Crect%20width%3D%2240%22%20height%3D%2240%22%20rx%3D%2211%22%20fill%3D%22%2316775c%22/%3E%3Cpath%20d%3D%22M8%2028C12%2028%2012%2011%2020%2011S28%2028%2032%2028M8%2020H32%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222.7%22%20stroke-linecap%3D%22round%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2211%22%20r%3D%223%22%20fill%3D%22white%22/%3E%3C/svg%3E">
+<meta name="description" content="数学、物理、地理的课堂演示模型，支持参数调节、立体几何、截面与展开图。">
+<title>知象 · 教学模型</title>
+<link rel="stylesheet" href="styles.css?v=20260929-logo">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+<aside class="sidebar" aria-label="主导航">
+  <button class="brand" data-action="home" aria-label="知象首页"><span class="brand-symbol" aria-hidden="true"></span><span><strong>知象</strong><small>教学模型</small></span></button>
+  <div class="nav-label">工具</div>
+  <nav class="nav-main" aria-label="模型与课堂">
+    <button class="nav-item active" data-nav="all"><span class="nav-icon"><i data-icon="grid"></i></span><span>模型库</span><span class="nav-count">13</span></button>
+    <button class="nav-item" data-nav="favorites"><span class="nav-icon"><i data-icon="heart"></i></span><span>我的收藏</span><span class="nav-count" id="favoriteCount">0</span></button>
+    <button class="nav-item" data-nav="classes"><span class="nav-icon"><i data-icon="classroom"></i></span><span>我的课堂</span><span class="nav-count" id="classCount">0</span></button>
+  </nav>
+  <div class="nav-label subjects-label">学科</div>
+  <nav class="subject-nav" aria-label="学科分类">
+    <button class="nav-item" data-category="math"><span class="nav-icon"><i data-icon="math"></i></span><span>数学</span><small>6</small></button>
+    <button class="nav-item" data-category="physics"><span class="nav-icon"><i data-icon="physics"></i></span><span>物理</span><small>6</small></button>
+    <button class="nav-item" data-category="geography"><span class="nav-icon"><i data-icon="earth"></i></span><span>地理</span><small>1</small></button>
+  </nav>
+  <div class="sidebar-note"><div class="nav-label">立体几何</div><button class="nav-item" data-collection="geometry"><span class="nav-icon"><i data-icon="solid"></i></span><span>三维模型</span><small>3</small></button></div>
+  <div class="sidebar-bottom"><button class="support-entry" data-action="support" aria-label="支持知象"><span class="support-icon" aria-hidden="true"><i data-icon="heart"></i></span><span class="support-copy"><strong>支持知象</strong><small>自愿支持维护</small></span></button></div>
+</aside>
+<div class="app-shell">
+  <header class="topbar"><div class="breadcrumb"><button class="header-brand" data-action="home" aria-label="知象首页"><span class="brand-symbol" aria-hidden="true"></span><strong>知象</strong></button><span>知象</span><b>/</b><strong id="pageCrumb">模型库</strong></div><div class="topbar-actions"><button class="icon-button" data-action="guide" aria-label="打开使用说明" title="使用说明"><i data-icon="help"></i>使用说明</button></div></header>
+  <main id="main" tabindex="-1"></main>
+  <footer class="site-footer"><span>知象 · 教学模型</span><div class="footer-actions"><button class="footer-support" data-action="support">支持知象</button><button data-action="about">模型说明与参考资料</button></div></footer>
+</div>
+<dialog id="dialog" aria-labelledby="dialogTitle"><div class="dialog-header"><h2 id="dialogTitle"></h2><button class="icon-button" data-action="close-dialog" aria-label="关闭弹窗"><i data-icon="close"></i></button></div><div id="dialogBody"></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<script src="geometry.js"></script>
+<script src="physics.js?v=20260929-resistance"></script>
+<script src="app.js?v=20260929-resistance"></script>
+</body>
+</html>
