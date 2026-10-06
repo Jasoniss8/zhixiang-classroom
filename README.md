@@ -10,6 +10,18 @@
 
 欢迎提交问题与改进；模型涉及教学简化，涉及数值与公式的改动请写明假设和验证方式。
 
+## GitHub 回归检查修复（2026-10-06）
+
+已拉取 `main`，触发失败的版本为 `bb7feba`。该次 [Model regression](https://github.com/Jasoniss8/zhixiang-classroom/actions/runs/37420458004) 已执行1252项，其中1250项通过；两组浏览器检查在退出大屏后调整窗口时中断，报 `Browser.setWindowBounds` 不允许改变仍处于全屏状态的窗口。应用的布局状态先恢复，Chromium 的系统窗口随后恢复，测试必须等待两个过程都完成。
+
+修复文件与函数：
+
+- `app.js` 的 `togglePresentation` 在进入请求完成后核对当前意图，撤销用户已经取消的迟到请求；`exitPresentation` 返回等待系统退出的 Promise，布局仍立即恢复。
+- `tests/runtime.cjs` 的 `waitForPresentationExit` 同时检查应用状态、CSS、DOM 全屏元素和 Chromium 窗口状态，等待正常窗口后再允许测试调整尺寸；超时提供状态诊断，结束时断开 CDP 会话。
+- `tests/check_models.cjs` 与 `tests/check_science_browser.cjs` 等待真实全屏进入/退出，继续执行全部窄屏、截图和离线检查。新增受控 Promise 回归，确认迟到请求确实进入并随后被撤销；新增三种物理/地理模型的系统退出检查。
+
+修复后运行 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' bash tests/run_all.sh --extended`：**19组、1369/1369通过，0失败、0环境错误**；测试服务器正常关闭。结果为 `output/playwright/run-20261006T060801.082732Z/summary.json`，两个原失败组分别为209/209、84/84通过，脚本语法及 `git diff --check` 通过。已运行 `python3 build.py` 生成712,057 B单文件。上述为本机macOS/Chrome执行结果，GitHub Linux运行以 [Model regression 工作流](https://github.com/Jasoniss8/zhixiang-classroom/actions/workflows/test.yml) 的新提交结果为准。
+
 ## 做题入口（2026-10-06，本地开发版）
 
 “做题”作为带铅笔图标的普通导航项，位于“模型库”下方，手机导航同步提供入口；已移除“上课 / 做题”切换。首页仍直接打开原有 22 个模型的模型库。做题支持粘贴一道文本题或导入 UTF-8 TXT，先匹配已有模型，再核对数值、单位和简化条件。文本最多 4000 字符，文件不超过 64 KB。没有图片识别、AI 接口或通用解题器，不生成任意新模型或完整解答。

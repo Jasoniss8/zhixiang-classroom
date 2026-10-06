@@ -3,7 +3,9 @@
    Run after: python3 build.py && python3 -m http.server 8000 --bind 127.0.0.1 */
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { chromium } = require('./runtime.cjs').loadPlaywright();
+const { waitForPresentationExit } = require('./runtime.cjs');
 const root = path.resolve(__dirname, '..');
 const out = require('./runtime.cjs').outputDir;
 fs.mkdirSync(out, { recursive: true });
@@ -12,6 +14,40 @@ let runningBrowser;
 function check(name, value, details) {
   results.push({ name, passed: !!value, ...(details === undefined ? {} : { details }) });
   console.log(`${value ? 'PASS' : 'FAIL'} ${name}${!value && details ? ' '+JSON.stringify(details) : ''}`);
+}
+async function checkCancelledFullscreenRequest() {
+  // Native fullscreen is exercised below in Chromium. Control promise timing
+  // separately using the actual application functions, without relying on a
+  // second transient user activation or treating an API rejection as success.
+  const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const start = source.indexOf('async function togglePresentation()');
+  const end = source.indexOf('function wrapCanvasText(', start);
+  if (start < 0 || end < 0) throw new Error('无法读取待验证的全屏生命周期函数。');
+  const classes = new Set(), label = {textContent: '大屏模式'};
+  let releaseEnter, entered = 0, exited = 0;
+  const simulatedDocument = {
+    fullscreenElement: null,
+    body: {classList: {add: value => classes.add(value), remove: value => classes.delete(value)}},
+    documentElement: {},
+  };
+  simulatedDocument.documentElement.requestFullscreen = () => new Promise(resolve => {
+    releaseEnter = () => { entered++; simulatedDocument.fullscreenElement = simulatedDocument.documentElement; resolve(); };
+  });
+  simulatedDocument.exitFullscreen = async () => { exited++; simulatedDocument.fullscreenElement = null; };
+  const scope = vm.createContext({
+    state: {model: {id: 'sections'}, presenting: false}, document: simulatedDocument,
+    $: () => label, requestDraw: () => {}, toast: () => {},
+  });
+  vm.runInContext(source.slice(start, end), scope, {filename: 'app.js fullscreen lifecycle'});
+  const entering = scope.togglePresentation();
+  await scope.exitPresentation();
+  const cancelledBeforeEntry = !scope.state.presenting && !simulatedDocument.fullscreenElement;
+  releaseEnter();
+  await entering;
+  const details = {cancelledBeforeEntry, entered, exited, presenting: scope.state.presenting,
+    fullscreen: !!simulatedDocument.fullscreenElement, presentingClass: classes.has('presenting'), label: label.textContent};
+  check('迟到的全屏入场在用户取消后被撤销（实际源码与受控 Promise）',
+    cancelledBeforeEntry && entered === 1 && exited === 1 && !details.presenting && !details.fullscreen && !details.presentingClass && details.label === '大屏模式', details);
 }
 (async () => {
   const options = { headless: true };
@@ -185,7 +221,12 @@ function check(name, value, details) {
   await page.locator('#importFile').setInputFiles(path.join(out,'export-config.json'));await page.locator('[data-action="confirm-import"]').click();
   check('实际文件导入恢复模型',await page.evaluate(()=>state.model.id==='sections'));
   await page.locator('[data-action="present"]').click();
-  check('进入大屏',await page.evaluate(()=>state.presenting));await page.keyboard.press('Escape');check('退出大屏',await page.evaluate(()=>!state.presenting));
+  await page.waitForFunction(()=>!!document.fullscreenElement);
+  check('进入大屏',await page.evaluate(()=>state.presenting&&document.body.classList.contains('presenting')&&!!document.fullscreenElement));
+  await page.keyboard.press('Escape');
+  const presentationExit=await waitForPresentationExit(page);
+  check('退出大屏',!presentationExit.presenting&&!presentationExit.presentingClass&&!presentationExit.fullscreenElement&&presentationExit.windowState==='normal',presentationExit);
+  await checkCancelledFullscreenRequest();
   for(const width of[390,768,1024,1440]){
     await page.setViewportSize({width,height:950});
     for(const id of['home',...ids]){

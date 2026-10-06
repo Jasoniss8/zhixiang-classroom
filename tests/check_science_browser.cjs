@@ -1,6 +1,7 @@
 /* Real controls, pointer gestures, playback, v1 data and offline export. */
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('./runtime.cjs').loadPlaywright();
+const {waitForPresentationExit}=require('./runtime.cjs');
 const root=path.resolve(__dirname,'..'),out=require('./runtime.cjs').outputDir;fs.mkdirSync(out,{recursive:true});
 const results=[],errors=[],remote=[];let browser;
 const check=(name,passed,details)=>{results.push({name,passed:!!passed,details});console.log(`${passed?'PASS':'FAIL'} ${name}${passed?'':' '+JSON.stringify(details)}`);};
@@ -81,7 +82,10 @@ const check=(name,passed,details)=>{results.push({name,passed:!!passed,details})
   const config=await page.evaluate(()=>JSON.stringify(state.p));await page.locator('[data-action=ink]').click();const b=await page.locator('#annotation').boundingBox();await page.mouse.move(b.x+80,b.y+80);await page.mouse.down();await page.mouse.move(b.x+120,b.y+110,{steps:5});await page.mouse.up();
   check(id+' 板书不操作底层模型',await page.evaluate(c=>state.strokes.length===1&&JSON.stringify(state.p)===c,config));await page.locator('[data-action=ink]').click();
   const png=page.waitForEvent('download');await page.locator('[data-action=screenshot]').click();await(await png).saveAs(path.join(out,id+'-export.png'));check(id+' PNG实际导出',fs.statSync(path.join(out,id+'-export.png')).size>20000);
-  await page.locator('[data-action=present]').click();check(id+' 大屏模式',await page.locator('body').evaluate(e=>e.classList.contains('presenting')));await page.keyboard.press('Escape');await page.evaluate(()=>exitPresentation());
+  await page.locator('[data-action=present]').click();await page.waitForFunction(()=>!!document.fullscreenElement);
+  check(id+' 大屏模式',await page.evaluate(()=>state.presenting&&document.body.classList.contains('presenting')&&!!document.fullscreenElement));
+  await page.keyboard.press('Escape');const exited=await waitForPresentationExit(page);
+  check(id+' 退出大屏后系统窗口恢复正常',!exited.presenting&&!exited.presentingClass&&!exited.fullscreenElement&&exited.windowState==='normal',exited);
  }
  const offline=await context.newPage(),requests=[];offline.on('pageerror',e=>errors.push(e.message));offline.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});await offline.goto('file://'+path.join(root,'standalone.html'));
  for(const id of['circular','electric','seasons']){await offline.evaluate(id=>openModel(id),id);await offline.waitForTimeout(100);check('离线单文件包含 '+id,await offline.locator('#formula').innerText().then(t=>t.length>0));}

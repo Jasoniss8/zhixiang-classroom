@@ -18,5 +18,29 @@ function loadPlaywright() {
   }
   return playwright;
 }
-module.exports = {baseURL, outputDir, loadPlaywright};
+// Fullscreen layout flags change synchronously, but Chromium's native window
+// restores asynchronously. Observe both before asking Playwright to resize it.
+async function waitForPresentationExit(page, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  const session = await page.context().newCDPSession(page);
+  let status = null;
+  try {
+    const {windowId} = await session.send('Browser.getWindowForTarget');
+    while (true) {
+      const dom = await page.evaluate(() => ({
+        presenting: state.presenting,
+        presentingClass: document.body.classList.contains('presenting'),
+        fullscreenElement: document.fullscreenElement?.tagName || null,
+      }));
+      const {bounds} = await session.send('Browser.getWindowBounds', {windowId});
+      status = {...dom, windowId, windowState: bounds.windowState};
+      if (!dom.presenting && !dom.presentingClass && !dom.fullscreenElement && bounds.windowState === 'normal') return status;
+      if (Date.now() >= deadline) throw new Error(`退出大屏后 ${timeoutMs}ms 内窗口未恢复正常：${JSON.stringify(status)}；页面 ${page.url()}`);
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  } finally {
+    await session.detach();
+  }
+}
+module.exports = {baseURL, outputDir, loadPlaywright, waitForPresentationExit};
 if (require.main === module) { loadPlaywright(); console.log('Playwright 与浏览器已就绪。'); }

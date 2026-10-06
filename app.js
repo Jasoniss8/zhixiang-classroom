@@ -1483,7 +1483,7 @@ function confirmImport() {
 async function togglePresentation() {
   if (!state.model) return;
   if (state.presenting) {
-    exitPresentation();
+    await exitPresentation();
     return;
   }
   state.presenting = true;
@@ -1491,18 +1491,20 @@ async function togglePresentation() {
   $("#presentLabel").textContent = "退出大屏";
   try {
     await document.documentElement.requestFullscreen?.();
+    // A user may leave the layout while the native fullscreen request is pending.
+    if (!state.presenting && document.fullscreenElement) await exitPresentation();
   } catch {
-    toast("已进入大屏布局；系统未允许全屏。");
+    if (state.presenting) toast("已进入大屏布局；系统未允许全屏。");
   }
   requestDraw();
 }
-function exitPresentation() {
-  if (!state.presenting) return;
+async function exitPresentation() {
+  if (!state.presenting && !document.fullscreenElement) return;
   state.presenting = false;
   document.body.classList.remove("presenting");
   if ($("#presentLabel")) $("#presentLabel").textContent = "大屏模式";
-  if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
   requestDraw();
+  if (document.fullscreenElement) await document.exitFullscreen?.().catch(() => {});
 }
 function wrapCanvasText(
   ctx,
