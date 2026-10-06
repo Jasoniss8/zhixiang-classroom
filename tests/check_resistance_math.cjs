@@ -67,7 +67,7 @@ for(const mass of[.1,2])for(const length of[.5,3])for(const g of[1.62,15])for(co
 }
 check('32组单摆边界的机械能不增加',largestGain<1e-7,largestGain);
 check('单摆能量损失与阻尼做功一致',worstBalance<1e-4,worstBalance);
-const out=path.resolve(__dirname,'../output/playwright');fs.mkdirSync(out,{recursive:true});
+const out=require('./runtime.cjs').outputDir;fs.mkdirSync(out,{recursive:true});
 fs.writeFileSync(path.join(out,'resistance-math-results.json'),JSON.stringify({date:new Date().toISOString(),checks:results.length,passed:results.filter(x=>x.passed).length,results},null,2));
 console.log(`RESULT ${results.filter(x=>x.passed).length}/${results.length}`);
 if(results.some(x=>!x.passed))process.exitCode=1;

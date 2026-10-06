@@ -3,9 +3,9 @@
    Run after: python3 build.py && python3 -m http.server 8000 --bind 127.0.0.1 */
 const fs = require('node:fs');
 const path = require('node:path');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+const { chromium } = require('./runtime.cjs').loadPlaywright();
 const root = path.resolve(__dirname, '..');
-const out = path.join(root, 'output', 'playwright');
+const out = require('./runtime.cjs').outputDir;
 fs.mkdirSync(out, { recursive: true });
 const results = [], errors = [], remoteRequests = [];
 let runningBrowser;
@@ -20,14 +20,14 @@ function check(name, value, details) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage();
   page.on('pageerror', e => errors.push(e.message));
-  page.on('request', r => { if (/^https?:/.test(r.url()) && !r.url().startsWith('http://127.0.0.1:8000/')) remoteRequests.push(r.url()); });
-  await page.goto('http://127.0.0.1:8000/index.html?qa=current');
-  check('首页保留13个模型', await page.locator('.model-card').count() === 13);
+  page.on('request', r => { if (/^https?:/.test(r.url()) && !r.url().startsWith((require('./runtime.cjs').baseURL + '/'))) remoteRequests.push(r.url()); });
+  await page.goto((require('./runtime.cjs').baseURL + '/index.html?qa=current'));
+  check('首页保留原有21个并新增透镜成像', await page.locator('.model-card').count() === 22);
   check('移除重复推荐条、标签与课堂脚本', await page.locator('.collection-bar,.card-chip,.control-tab,.hero').count() === 0);
   await page.locator('#threeDFilter').check();
   check('只看三维为3个模块', await page.locator('.model-card').count() === 3);
   await page.locator('#threeDFilter').uncheck();
-  for (const [cat,count] of [['math',6],['physics',6],['geography',1],['all',13]]) {
+  for (const [cat,count] of [['math',8],['physics',12],['geography',2],['all',22]]) {
     await page.locator(`[data-filter="${cat}"]`).click();
     check(`学科筛选${cat}`, await page.locator('.model-card').count() === count);
   }
@@ -213,10 +213,10 @@ function check(name, value, details) {
   const offline=await browser.newContext({viewport:{width:390,height:844}}),offlinePage=await offline.newPage(),network=[];
   offlinePage.on('request',r=>{if(/^https?:/.test(r.url()))network.push(r.url());});offlinePage.on('pageerror',e=>errors.push(e.message));
   await offlinePage.goto('file://'+path.join(root,'standalone.html'));
-  check('单文件首页13模型',await offlinePage.locator('.model-card').count()===13);
+  check('单文件首页22模型',await offlinePage.locator('.model-card').count()===22);
   for(const id of ids){await offlinePage.evaluate(id=>openModel(id),id);await offlinePage.waitForTimeout(20);}
   check('单文件所有模型无需网络',network.length===0,network);
-  const storagePage=await context.newPage();await storagePage.addInitScript(()=>Object.defineProperty(window,'localStorage',{get(){throw new Error('Disabled for test');}}));await storagePage.goto('http://127.0.0.1:8000/index.html?qa=storage');
+  const storagePage=await context.newPage();await storagePage.addInitScript(()=>Object.defineProperty(window,'localStorage',{get(){throw new Error('Disabled for test');}}));await storagePage.goto((require('./runtime.cjs').baseURL + '/index.html?qa=storage'));
   check('禁用存储仍可操作',await storagePage.locator('.storage-warning').count()>0&&await storagePage.evaluate(()=>{openModel('gas');return state.particles.length>0;}));
   check('控制台无异常',errors.length===0,errors);check('无外部请求',remoteRequests.length===0,remoteRequests);
   await browser.close();

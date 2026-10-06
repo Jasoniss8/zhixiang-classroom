@@ -1,0 +1,10 @@
+{
+  "name": "zhixiang-regression-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Development-only browser regression dependency; not shipped with the application.",
+  "devDependencies": {
+    "jsqr": "1.4.0",
+    "playwright": "1.60.0"
+  }
+}

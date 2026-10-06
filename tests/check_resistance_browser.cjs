@@ -1,6 +1,6 @@
 const fs=require('node:fs'),path=require('node:path');
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
-const out=path.resolve(__dirname,'../output/playwright'),results=[],errors=[];
+const {chromium}=require('./runtime.cjs').loadPlaywright();
+const out=require('./runtime.cjs').outputDir,results=[],errors=[];
 function check(name,passed,details){results.push({name,passed:!!passed,details});console.log(`${passed?'PASS':'FAIL'} ${name}`);}
 (async()=>{
  const options={headless:true};if(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)options.executablePath=process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
@@ -8,7 +8,7 @@ function check(name,passed,details){results.push({name,passed:!!passed,details})
  try{
   const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true}),page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('http://127.0.0.1:8000/index.html?qa=resistance#model=projectile');
+  await page.goto((require('./runtime.cjs').baseURL + '/index.html?qa=resistance#model=projectile'));
   check('旧抛体配置默认理想条件',await page.evaluate(()=>{const p=safeParams(modelById('projectile'),{v:25,angle:30,height:3,g:9.8});return p.motionMode==='ideal'&&p.v===25&&p.area===.0042;}));
   check('旧单摆配置默认无阻尼',await page.evaluate(()=>safeParams(modelById('pendulum'),{angle:60,length:2,g:9.8,mass:.5}).motionMode==='ideal'));
   await page.getByRole('radio',{name:'理想与含阻力对照'}).check();

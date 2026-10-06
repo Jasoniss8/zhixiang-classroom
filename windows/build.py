@@ -3,6 +3,7 @@
 
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
+import json
 import shutil
 import subprocess
 import sys
@@ -27,8 +28,14 @@ def main() -> None:
         if path.exists():
             shutil.rmtree(path)
     STAGE.mkdir(parents=True)
-    for filename in ('main.cjs', 'package.json', 'icon.png', 'icon.ico'):
+    for filename in ('main.cjs', 'preload.cjs', 'update-service.cjs', 'package.json', 'icon.png', 'icon.ico'):
         shutil.copy2(SOURCE / filename, STAGE / filename)
+
+    release = json.loads((ROOT / 'desktop' / 'release.json').read_text(encoding='utf-8'))
+    shutil.copy2(ROOT / 'desktop' / 'release.json', STAGE / 'release.json')
+    package = json.loads((STAGE / 'package.json').read_text(encoding='utf-8'))
+    package['version'] = release['shellVersion']
+    (STAGE / 'package.json').write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
     subprocess.run(
         [sys.executable, str(ROOT / 'build.py'), '--output', str(STAGE / 'app.html')],
@@ -56,7 +63,8 @@ def main() -> None:
         '1. 解压整个文件夹，不要只提取 exe 文件。\n'
         '2. 双击 Zhixiang.exe 打开知象独立窗口。\n'
         '3. 内置运行环境和全部模型，使用时无需浏览器、Python 或网络。\n'
-        '4. 程序未购买 Windows 代码签名证书；系统可能显示来源提示。\n\n'
+        '4. 菜单“帮助 → 检查更新”可主动联网检查；页面更新校验成功后刷新。\n'
+        '5. 程序未购买 Windows 代码签名证书；系统可能显示来源提示。\n\n'
         '收藏与课堂配置保存在这台电脑上的知象应用中。更新程序或更换电脑前，'
         '建议在“我的课堂”导出备份。\n',
         encoding='utf-8',

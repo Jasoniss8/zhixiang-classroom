@@ -12,35 +12,38 @@ iconset_path="$output_root/Zhixiang.iconset"
 mkdir -p "$resources_path" "$binary_path" "$iconset_path"
 python3 "$project_root/build.py" --output "$resources_path/standalone.html"
 
-cat > "$contents_path/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleDevelopmentRegion</key><string>zh_CN</string>
-  <key>CFBundleDisplayName</key><string>知象</string>
-  <key>CFBundleExecutable</key><string>Zhixiang</string>
-  <key>CFBundleIconFile</key><string>Zhixiang.icns</string>
-  <key>CFBundleIdentifier</key><string>cn.zhixiang.classroom</string>
-  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-  <key>CFBundleName</key><string>知象</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0.0</string>
-  <key>CFBundleVersion</key><string>1</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
-  <key>NSHighResolutionCapable</key><true/>
-</dict>
-</plist>
-PLIST
+python3 - "$project_root/desktop/release.json" "$resources_path/release.json" "$contents_path/Info.plist" <<'PYVERSION'
+import json
+import plistlib
+import re
+import shutil
+import sys
+from pathlib import Path
+
+release = json.loads(Path(sys.argv[1]).read_text())
+for key in ('version', 'shellVersion'):
+    if not re.fullmatch(r'(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})', release[key]):
+        raise SystemExit(f'Invalid desktop release {key}')
+shutil.copyfile(sys.argv[1], sys.argv[2])
+info = {
+    'CFBundleDevelopmentRegion': 'zh_CN', 'CFBundleDisplayName': '知象',
+    'CFBundleExecutable': 'Zhixiang', 'CFBundleIconFile': 'Zhixiang.icns',
+    'CFBundleIdentifier': 'cn.zhixiang.classroom', 'CFBundleInfoDictionaryVersion': '6.0',
+    'CFBundleName': '知象', 'CFBundlePackageType': 'APPL',
+    'CFBundleShortVersionString': release['shellVersion'], 'CFBundleVersion': release['shellVersion'],
+    'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
+}
+Path(sys.argv[3]).write_bytes(plistlib.dumps(info))
+PYVERSION
 
 mkdir -p "$output_root/.module-cache"
 CLANG_MODULE_CACHE_PATH="$output_root/.module-cache" \
 SWIFT_MODULE_CACHE_PATH="$output_root/.module-cache" \
 xcrun swiftc -O -target arm64-apple-macos13.0 \
-  -framework AppKit -framework WebKit \
-  "$project_root/macos/ZhixiangApp.swift" -o "$binary_path/Zhixiang"
+  -framework AppKit -framework WebKit -framework CryptoKit \
+  "$project_root/macos/ZhixiangApp.swift" "$project_root/macos/DesktopUpdater.swift" -o "$binary_path/Zhixiang"
 
-sips --cropToHeightWidth 1024 1024 "$project_root/assets/zhixiang-logo.png" \
+sips --resampleHeightWidth 1024 1024 "$project_root/macos/icon.png" \
   --out "$iconset_path/icon_512x512@2x.png" >/dev/null
 for size in 16 32 64 128 256 512; do
   sips --resampleHeightWidth "$size" "$size" \
