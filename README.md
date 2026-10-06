@@ -462,6 +462,43 @@ Windows 可直接运行 `py -3 tests/run_all.py --extended`。每次结果写入
 
 下方各模型增补批次的测试数量、文件位置和执行环境保留作历史记录；包括最末的 830 项结果在内，均不是本轮 C1–C7 的最终结果。当前运行方式和本轮进展以上节为准。旧理论核对参考 [OpenStax 气体动理论](https://openstax.org/books/chemistry/pages/9-5-the-kinetic-molecular-theory) 与 [非线性单摆周期](https://openstax.org/books/calculus-volume-2/pages/6-4-working-with-taylor-series)，模型参数面板也保留相应资料。
 
+## 访问统计与后台
+
+网站 `https://zhixiang-classroom.pages.dev/` 匿名统计页面浏览、模型打开（含入口：卡片、分享链接、课堂、做题）、功能按钮（大屏、保存课堂、截图、导出参数/数据、复制分享链接、板书、做题提交、下载桌面版）和搜索词（停顿 1.5 秒后记录，最多 40 字）。站长在 `/admin/` 用密码登录查看趋势、模型排行、功能使用、来源、设备和搜索词，并可导出按天汇总的 CSV。
+
+隐私边界：
+- 只在 `https` 的正式域名上发送；`file://`、本地预览、单文件版和桌面版都不发送。浏览器开启 Do Not Track 或 Global Privacy Control 时不发送。
+- 不使用 cookie，不保存 IP 或 User-Agent 原文。访客数按“当日随机盐 + IP + UA”的哈希去重，盐每天更换并删除旧盐，跨天无法关联。
+- 不上传参数值、题目文本、课堂名称、收藏或板书。服务端只接受白名单内的事件类型、页面、功能名和模型 id。
+- 原始事件保留 180 天。
+
+结构：
+- `analytics.js`：前端上报（`navigator.sendBeacon`），由 `build.py` 放在 `app.js` 之前。
+- `functions/api/event.js`：接收事件；`functions/api/admin/*`：登录、退出、登录状态、统计、CSV；`_middleware.js` 统一校验同源与会话。
+- `server/`：共享逻辑（白名单、PBKDF2、会话签名、访客哈希、锁定、统计）。`server/models.js` 由 `build.py` 从模型清单生成。
+- `admin/`：后台页面，原生 JS 和手写 SVG，不加载外部资源；`desktop/prepare_release.py` 把它复制进 `dist/` 并加上禁止缓存、禁止索引、禁止嵌入和 CSP 响应头。
+- `schema.sql`：D1 表结构。
+
+登录安全：密码只以 PBKDF2-SHA256（10 万次迭代）哈希存于 Cloudflare Secret `ADMIN_PASSWORD_HASH`；会话为 HMAC 签名的 `HttpOnly; Secure; SameSite=Strict` cookie，12 小时过期，密钥为 Secret `SESSION_SECRET`。同一来源连续输错 5 次锁定 15 分钟。更换 `SESSION_SECRET` 可让所有登录立即失效。
+
+### 一次性配置（Cloudflare）
+
+```sh
+npx wrangler d1 create zhixiang-analytics
+npx wrangler d1 execute zhixiang-analytics --remote --file schema.sql
+python3 tools/hash-password.py
+```
+
+1. 在 Cloudflare 控制台 → Workers 和 Pages → `zhixiang-classroom` → 设置 → 绑定，添加 D1 数据库，变量名填 `DB`，选 `zhixiang-analytics`。
+2. 同一项目 → 设置 → 变量和机密，添加两个“密钥”类型变量：`ADMIN_PASSWORD_HASH`、`SESSION_SECRET`，值取自 `hash-password.py` 的输出。密码建议至少 12 个字符；改密码时重新运行脚本并替换 `ADMIN_PASSWORD_HASH`。
+3. 重新部署后打开 `https://zhixiang-classroom.pages.dev/admin/`。
+
+### 本地预览与测试
+
+`node tests/admin-dev-server.cjs 8788` 在本机用真实的 Functions 代码和内存 SQLite 模拟线上，打开 `http://127.0.0.1:8788/admin/`，本地密码为 `local admin password`（仅本地开发）。加 `--seed` 会生成演示用的虚构数据，不能当作真实统计。
+
+`tests/check_analytics_server.cjs` 用 `node:sqlite` 替身覆盖接口校验、隐私、登录锁定、会话与统计；`tests/check_analytics_browser.cjs` 覆盖网站上报内容、请勿追踪，以及后台登录、仪表盘、窄屏与深色模式。两者由 `tests/run_all.sh --extended` 自动收集。
+
 ## 桌面下载、更新与发布
 
 网站的 `#downloads` 页面使用 `desktop/latest.json` 显示 macOS Apple 芯片版和 Windows x64 版的下载信息。安装包存放在 GitHub Release，页面与更新清单使用 Cloudflare Pages；下载包无需 GitHub、Cloudflare 或 ChatGPT 账号。桌面模型运行仍可离线；主动检查或下载更新时需要联网。

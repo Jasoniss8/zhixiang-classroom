@@ -40,7 +40,16 @@ HEADERS = """/desktop/latest.json
   Cache-Control: no-cache
 /index.html
   Cache-Control: no-cache
+/admin/*
+  Cache-Control: no-store
+  X-Robots-Tag: noindex
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'
 """
+
+# Static admin dashboard deployed beside the site; its API lives in functions/.
+ADMIN_FILES = ('admin/index.html', 'admin/admin.css', 'admin/admin.js')
 
 
 # Pages normally redirects .html to an extensionless URL. Desktop updaters pin
@@ -220,9 +229,14 @@ def write_payload(directory, payload):
             (directory / name).write_bytes(value)
 
 
-def verify_dist(directory, config, payload):
+def site_files(root):
+    return {name: regular_file(root / name).read_bytes() for name in ADMIN_FILES}
+
+
+def verify_dist(directory, config, payload, site):
     version = config['version']
     expected = {
+        **site,
         'index.html': payload['standalone.html'],
         'desktop/latest.json': payload['latest.json'],
         f'desktop/releases/{version}/standalone.html': payload['standalone.html'],
@@ -241,7 +255,7 @@ def verify_dist(directory, config, payload):
                 raise ValueError(f'dist 出现不在发布白名单的文件：{name}')
 
 
-def stage_dist(root, config, payload):
+def stage_dist(root, config, payload, site):
     destination = root / 'dist'
     if destination.is_symlink():
         raise ValueError('dist 不允许符号链接。')
@@ -272,7 +286,10 @@ def stage_dist(root, config, payload):
         (temporary / 'desktop/latest.json').write_bytes(payload['latest.json'])
         (temporary / '_headers').write_text(HEADERS, encoding='utf-8')
         (temporary / '_redirects').write_text(REDIRECTS, encoding='utf-8')
-        verify_dist(temporary, config, payload)
+        for name, data in site.items():
+            (temporary / name).parent.mkdir(parents=True, exist_ok=True)
+            (temporary / name).write_bytes(data)
+        verify_dist(temporary, config, payload, site)
         if destination.exists():
             backup = Path(tempfile.mkdtemp(prefix='.release-dist-backup-', dir=root))
             backup.rmdir()
@@ -323,10 +340,11 @@ def prepare(root=ROOT, verify_only=False):
         finally:
             if temporary.exists():
                 shutil.rmtree(temporary)
+    site = site_files(root)
     if verify_only:
-        verify_dist(root / 'dist', config, payload)
+        verify_dist(root / 'dist', config, payload, site)
     else:
-        stage_dist(root, config, payload)
+        stage_dist(root, config, payload, site)
     return directory
 
 

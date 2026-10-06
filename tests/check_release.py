@@ -88,6 +88,9 @@ def make_packages(root, page=PAGE, shell='1.1.0'):
 def create_fixture(root):
     write_config(root, CONFIG)
     (root / 'standalone.html').write_bytes(PAGE)
+    (root / 'admin').mkdir(exist_ok=True)
+    for name in TOOLS['ADMIN_FILES']:
+        (root / name).write_bytes(('fixture ' + name).encode())
     make_packages(root)
 
 
@@ -162,6 +165,13 @@ def preparation_checks(root):
     prepare(root)
     check('代理配置不改变版本页面及清单地址', lambda: (root / 'dist/desktop/releases/1.1.0/standalone.html').read_bytes() == PAGE and json.loads((root / 'dist/desktop/latest.json').read_text()) == manifest)
 
+    headers = (root / 'dist/_headers').read_text()
+    check('后台页面随网站部署且内容一致', lambda: all((root / 'dist' / name).read_bytes() == (root / name).read_bytes() for name in TOOLS['ADMIN_FILES']))
+    check('后台页面禁止缓存、索引与嵌入并带 CSP', lambda: '/admin/*' in headers and all(h in headers.split('/admin/*', 1)[1] for h in ('Cache-Control: no-store', 'X-Robots-Tag: noindex', 'X-Frame-Options: DENY', "Content-Security-Policy: default-src 'self'")))
+    (root / 'dist/admin/admin.js').write_bytes(b'tampered')
+    check('部署校验拒绝被改动的后台文件', lambda: rejects(lambda: prepare(root, True)))
+    prepare(root)
+    check('重新准备恢复后台文件', lambda: (root / 'dist/admin/admin.js').read_bytes() == (root / 'admin/admin.js').read_bytes())
     (root / 'dist/secret.txt').write_text('fixture only')
     check('部署校验拒绝额外文件', lambda: rejects(lambda: prepare(root, True)))
     prepare(root)
