@@ -87,7 +87,7 @@ async function eventEndpoint() {
 async function adminApp(env) {
   const middleware = await load('functions/api/admin/_middleware.js');
   const routes = {};
-  for (const name of ['login', 'logout', 'stats', 'export']) {
+  for (const name of ['login', 'logout', 'session', 'stats', 'export']) {
     const file = path.join(root, 'functions/api/admin', name + '.js');
     if (fs.existsSync(file)) routes['/api/admin/' + name] = await import(file);
   }
@@ -110,6 +110,7 @@ async function adminAuth() {
   check('会话 cookie 属性安全', ['HttpOnly', 'Secure', 'SameSite=Strict', 'Path=/api/admin', 'Max-Age=43200'].every((a) => setCookie.includes(a)), setCookie);
   const cookie = cookieOf(ok);
   check('携带会话可访问后台接口', (await app(get('/api/admin/logout', { Cookie: cookie }))).status === 405);
+  check('session 接口报告登录状态', (await (await app(get('/api/admin/session', { Cookie: cookie }))).json()).signedIn === true && (await (await app(get('/api/admin/session'))).json()).signedIn === false);
   check('无会话访问 401', (await app(get('/api/admin/stats'))).status === 401);
   const tampered = cookie.replace(/.$/, (c) => (c === '0' ? '1' : '0'));
   check('篡改会话 401', (await app(get('/api/admin/stats', { Cookie: tampered }))).status === 401);

@@ -47,7 +47,7 @@ def build(destination: Path) -> Path:
     if (root / 'models/shared.js').is_file():
         scripts.append('models/shared.js')
     scripts += ['models/' + name + '.js' for name in modules]
-    scripts += ['vendor/qr.js', 'sharing.js', 'accessibility.js', 'chart-export.js', 'desktop-version.js', 'desktop-ui.js', 'question-matcher.js', 'question-ui.js', 'app.js']
+    scripts += ['vendor/qr.js', 'sharing.js', 'accessibility.js', 'chart-export.js', 'desktop-version.js', 'desktop-ui.js', 'question-matcher.js', 'question-ui.js', 'analytics.js', 'app.js']
     index = root / 'index.html'
     html = index.read_text(encoding='utf-8')
     block = '<!-- scripts:start -->\n' + '\n'.join('<script src="' + name + '"></script>' for name in scripts) + '\n<!-- scripts:end -->'

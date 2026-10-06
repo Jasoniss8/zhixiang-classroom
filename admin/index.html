@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#16775c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2040%2040%22%3E%3Crect%20width%3D%2240%22%20height%3D%2240%22%20rx%3D%2211%22%20fill%3D%22%2316775c%22/%3E%3Cpath%20d%3D%22M8%2028C12%2028%2012%2011%2020%2011S28%2028%2032%2028M8%2020H32%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%222.7%22%20stroke-linecap%3D%22round%22/%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2211%22%20r%3D%223%22%20fill%3D%22white%22/%3E%3C/svg%3E">
+<title>知象 · 后台</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<svg width="0" height="0" class="defs" aria-hidden="true"><symbol id="logo" viewBox="0 0 40 40"><rect width="40" height="40" rx="11" fill="#16775c"/><path d="M8 28C12 28 12 11 20 11S28 28 32 28M8 20H32" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round"/><circle cx="20" cy="11" r="3" fill="#fff"/></symbol></svg>
+
+<main id="login" class="login" hidden>
+  <form class="login-card" id="loginForm" novalidate>
+    <svg class="logo" aria-hidden="true"><use href="#logo"/></svg>
+    <h1>知象 · 后台</h1>
+    <p class="login-sub">访问与使用统计</p>
+    <label for="password">密码</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <p class="login-message" id="loginMessage" role="alert" aria-live="polite"></p>
+    <button class="primary" id="loginButton" type="submit">登录</button>
+  </form>
+</main>
+
+<div id="dashboard" class="dashboard" hidden>
+  <header class="topbar">
+    <div class="title">
+      <svg class="logo small" aria-hidden="true"><use href="#logo"/></svg>
+      <div><h1>知象 · 后台</h1><p id="updated">正在读取…</p></div>
+    </div>
+    <div class="actions">
+      <div class="segmented" role="group" aria-label="时间范围">
+        <button data-range="today">今天</button>
+        <button data-range="7d" aria-pressed="true">7 天</button>
+        <button data-range="30d">30 天</button>
+        <button data-range="90d">90 天</button>
+      </div>
+      <button class="ghost" id="refresh" title="刷新" aria-label="刷新数据"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+      <a class="ghost" id="exportCSV" href="/api/admin/export?range=7d" download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg><span>CSV</span></a>
+      <button class="ghost" id="logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span>退出</span></button>
+    </div>
+  </header>
+
+  <p class="banner" id="banner" role="alert" hidden></p>
+
+  <section class="kpis" aria-label="汇总">
+    <article class="card kpi"><span>浏览量</span><strong id="kpiViews">–</strong><small id="kpiViewsDelta"></small></article>
+    <article class="card kpi"><span>访客（按日去重）</span><strong id="kpiVisitors">–</strong><small id="kpiVisitorsDelta"></small></article>
+    <article class="card kpi"><span>模型打开</span><strong id="kpiOpens">–</strong><small id="kpiOpensDelta"></small></article>
+    <article class="card kpi"><span>大屏模式</span><strong id="kpiPresent">–</strong><small id="kpiPresentDelta"></small></article>
+  </section>
+
+  <section class="card trend-card" aria-labelledby="trendTitle">
+    <div class="card-head">
+      <h2 id="trendTitle">访问趋势</h2>
+      <div class="legend"><span class="key views"></span>浏览量<span class="key opens"></span>模型打开</div>
+    </div>
+    <div class="chart" id="trendChart"></div>
+  </section>
+
+  <div class="grid two">
+    <section class="card" aria-labelledby="modelsTitle">
+      <div class="card-head">
+        <h2 id="modelsTitle">模型排行</h2>
+        <div class="chips" role="group" aria-label="学科">
+          <button data-cat="all" aria-pressed="true">全部</button>
+          <button data-cat="math">数学</button>
+          <button data-cat="physics">物理</button>
+          <button data-cat="geography">地理</button>
+        </div>
+      </div>
+      <ol class="bars" id="modelList"></ol>
+      <button class="link" id="modelMore"></button>
+      <div class="drill" id="modelDrill" hidden>
+        <div class="card-head"><h3 id="drillTitle"></h3><button class="link" id="drillClose">收起</button></div>
+        <div class="chart small" id="drillChart"></div>
+      </div>
+    </section>
+    <section class="card" aria-labelledby="featuresTitle">
+      <div class="card-head"><h2 id="featuresTitle">功能使用</h2></div>
+      <ol class="bars features" id="featureList"></ol>
+    </section>
+  </div>
+
+  <div class="grid three">
+    <section class="card" aria-labelledby="sourcesTitle">
+      <div class="card-head"><h2 id="sourcesTitle">来源</h2></div>
+      <ol class="rows" id="sourceList"></ol>
+    </section>
+    <section class="card" aria-labelledby="devicesTitle">
+      <div class="card-head"><h2 id="devicesTitle">设备</h2></div>
+      <div class="stack" id="deviceBar"></div>
+      <ul class="device-legend" id="deviceLegend"></ul>
+    </section>
+    <section class="card" aria-labelledby="searchTitle">
+      <div class="card-head"><h2 id="searchTitle">搜索词</h2></div>
+      <div class="tags" id="searchList"></div>
+    </section>
+  </div>
+  <footer class="foot">只统计网站访问；不记录 IP、参数、题目文本或课堂名称。数据保留 180 天。</footer>
+</div>
+<script src="admin.js"></script>
+</body>
+</html>

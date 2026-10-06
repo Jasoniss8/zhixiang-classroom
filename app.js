@@ -444,8 +444,10 @@ function showLibrary(view = "all", category = "all") {
   renderLibrary();
   window.scrollTo(0, 0);
 }
+const VIEW_PAGES = { all: "home", favorites: "favorites", classes: "classes", questions: "questions", downloads: "downloads" };
 function renderLibrary() {
   setActiveNav();
+  ZhixiangAnalytics.view(VIEW_PAGES[state.view] || "home");
   if (state.view === "questions") {
     $("#pageCrumb").textContent = "做题";
     renderQuestionPage();
@@ -571,7 +573,7 @@ function paramHTML(c, p) {
   return `<div class="param"><div class="param-head"><label class="param-label" for="range-${key}"><span class="param-symbol">${symbol}</span>${label}</label><div class="param-value"><input id="number-${key}" data-param-number="${key}" type="number" min="${min}" max="${max}" step="${step}" value="${p[key]}" aria-label="${label}数值"><span>${unit}</span></div></div><input id="range-${key}" type="range" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${p[key]}" aria-label="${label}"><div class="range-extents"><span>${min}${unit ? " " + unit : ""}</span><span>${max}${unit ? " " + unit : ""}</span></div></div>`;
 }
 
-function openModel(id, params = null, question = null) {
+function openModel(id, params = null, question = null, via = "other") {
   const m = modelById(id);
   if (!m) {
     toast("未找到这个模型，已返回模型库。");
@@ -609,6 +611,7 @@ function openModel(id, params = null, question = null) {
   if (activeQuestion) activeQuestion.originalParams = { ...state.p };
   resetSolver();
   renderDemo();
+  ZhixiangAnalytics.track("model_open", { model: id, via: question ? "question" : via });
   setRoute(
     new URLSearchParams({
       model: id,
@@ -630,6 +633,7 @@ function standardPlayback(m) {
 function renderDemo() {
   const m = state.model;
   setActiveNav();
+  ZhixiangAnalytics.view("model");
   $("#pageCrumb").textContent = (activeQuestion ? "做题" : CATS[m.cat].name) + " / " + m.title;
   $("#main").innerHTML =
     `<section class="demo-header"><div class="demo-heading"><button class="icon-button back-button" data-action="home" aria-label="返回模型库">${icon("back")}</button><div><div class="demo-title-row"><h1>${m.title}</h1><span class="demo-tag ${m.cat}">${CATS[m.cat].name}</span></div><p>${m.desc}</p></div></div><div class="demo-actions">${m.exportData ? `<button class="button secondary" data-export-data>${icon("download")}<span>导出数据</span></button>` : ""}<button class="button secondary" data-action="share" title="导出当前模型参数">${icon("share")}<span>导出参数</span></button><button class="button secondary" data-action="save">${icon("save")}<span>保存课堂</span></button><button class="button primary" data-action="present">${icon("fullscreen")}<span id="presentLabel">大屏模式</span></button></div></section><div class="demo-layout model-${m.id} ${m.advanced ? "advanced-layout advanced-" + m.id : ""} ${m.science ? "science-layout science-" + m.id : ""} ${m.threeD ? "geometry-layout geometry-" + m.id : ""}"><div class="demo-left"><section class="canvas-panel" aria-label="互动模型演示"><div class="canvas-toolbar"><div class="status"><span id="simulationStatus">${m.threeD ? "拖动旋转 · 滚轮缩放" : m.time ? "点击播放" : "拖动参数"}</span><button class="mobile-param-jump" data-action="to-params">参数 ↓</button></div><div class="canvas-tools">${m.compare ? `<button class="icon-button" data-action="compare" title="对照曲线" aria-label="保存或清除对照曲线">${icon("compare")}</button><span class="sep"></span>` : ""}<button class="icon-button" id="inkButton" data-action="ink" title="板书 / 自由标注" aria-label="开启板书" aria-pressed="false">${icon("pencil")}</button><button class="icon-button" data-action="clear-ink" title="清空板书" aria-label="清空板书">${icon("trash")}</button><span class="sep"></span><button class="icon-button" data-action="screenshot" title="导出当前模型图片" aria-label="导出当前模型图片">${icon("camera")}</button></div></div>${m.threeD ? geometryToolbar() : ""}<div class="stage ${m.threeD ? "stage-3d" : ""}" id="stage"><canvas id="simCanvas" tabindex="0" role="img" aria-live="off" aria-label="${m.title}动态图。可通过参数滑块或数值输入操作；结果显示在下方。"></canvas><canvas id="annotation" aria-label="课堂板书画布"></canvas><div class="comparison-legend" id="comparisonLegend" hidden><span class="legend-item"><span class="legend-line"></span>当前模型</span><span class="legend-item"><span class="legend-line compare"></span>对照曲线</span></div></div><div class="stage-hint">${m.hint}</div><div class="formula-bar"><div><div class="formula-text" id="formula"></div><div class="formula-caption" id="formulaCaption"></div></div></div><div class="playback">${m.threeD ? geometryPlayback() : standardPlayback(m)}</div></section><div class="metrics" id="metrics" aria-live="off"></div><details class="model-question"><summary>讨论问题</summary><p>${m.question}</p><button data-action="answer" id="answerButton">查看解答</button><p class="answer" id="answerText" hidden>${m.answer}</p></details></div><aside class="control-panel" id="controlPanel" aria-label="模型参数"><div class="control-heading">参数<button class="mobile-stage-jump" data-action="to-model">回到模型 ↑</button></div><div class="control-body" id="controlBody"></div></aside></div>`;
@@ -1864,7 +1868,7 @@ function action(name) {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b || b.disabled) return;
-  if (b.dataset.open) return openModel(b.dataset.open);
+  if (b.dataset.open) return openModel(b.dataset.open, null, null, "card");
   if (b.dataset.favorite) return toggleFavorite(b.dataset.favorite);
   if (b.dataset.nav) return showLibrary(b.dataset.nav);
   if (b.dataset.category) return showLibrary("all", b.dataset.category);
@@ -1893,7 +1897,7 @@ document.addEventListener("click", (e) => {
   }
   if (b.dataset.classOpen) {
     const c = store.classes.find((s) => s.id === b.dataset.classOpen);
-    if (c) openModel(c.model, c.p);
+    if (c) openModel(c.model, c.p, null, "class");
     return;
   }
   if (b.dataset.classExport) {
@@ -2092,7 +2096,7 @@ function routeFromHash() {
     } catch {
       toast("链接中的参数无法读取，使用默认参数。");
     }
-    openModel(model, p);
+    openModel(model, p, null, "link");
   } else {
     const v = ["all", "favorites", "classes", "downloads", "questions"].includes(args.get("view"))
         ? args.get("view")
