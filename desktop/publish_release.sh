@@ -7,8 +7,33 @@ python_command="${PYTHON:-python3}"
 deploy_only=false
 if [ "${1:-}" = "--deploy-only" ] && [ "$#" -eq 1 ]; then
   deploy_only=true
+elif [ "${1:-}" = "--site-only" ] && [ "$#" -eq 1 ]; then
+  # Website-only: new home page, admin and Functions. The desktop manifest and
+  # versioned pages stay byte-identical to the live release; GitHub is not touched.
+  for command_name in "$python_command" npx curl; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+      printf '缺少发布工具：%s\n' "$command_name" >&2
+      exit 2
+    fi
+  done
+  "$python_command" desktop/prepare_release.py --site-only
+  manifest_url="$("$python_command" -c 'import json; print(json.load(open("desktop/release.json"))["manifestURL"])')"
+  live_manifest="$(mktemp)"
+  trap 'rm -f "$live_manifest"' EXIT
+  if ! curl -fsS --max-time 20 "$manifest_url" -o "$live_manifest"; then
+    printf '%s\n' '无法读取线上更新清单，未部署网站。' >&2
+    exit 1
+  fi
+  if ! cmp -s "$live_manifest" dist/desktop/latest.json; then
+    printf '%s\n' '线上更新清单与本地发布文件不一致，未部署网站；请先核对当前桌面版本。' >&2
+    exit 1
+  fi
+  npx --yes wrangler@4.143.0 pages deploy "$project_root/dist" \
+    --project-name zhixiang-classroom --branch main --commit-dirty=true
+  printf '%s\n' '已更新网站；后台：https://zhixiang-classroom.pages.dev/admin/'
+  exit 0
 elif [ "$#" -ne 0 ]; then
-  printf '%s\n' '用法：bash desktop/publish_release.sh [--deploy-only]' >&2
+  printf '%s\n' '用法：bash desktop/publish_release.sh [--deploy-only | --site-only]' >&2
   exit 2
 fi
 for command_name in "$python_command" gh npx; do

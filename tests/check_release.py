@@ -140,6 +140,27 @@ def config_checks(root):
     write_config(root, CONFIG)
 
 
+def site_only_checks(root):
+    prepare_site = TOOLS['prepare_site']
+    create_fixture(root)
+    check('只更新网站要求已有发布版本目录', lambda: rejects(lambda: prepare_site(root), '已发布版本目录'))
+    release = TOOLS['prepare'](root)
+    frozen = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in release.iterdir()}
+    manifest = (root / 'dist/desktop/latest.json').read_bytes()
+    site_page = PAGE.replace(b'</body>', b'<script>/* analytics */</script></body>') if b'</body>' in PAGE else PAGE + b'<!-- site -->'
+    (root / 'standalone.html').write_bytes(site_page)
+    prepare_site(root)
+    check('只更新网站：首页换成新页面', lambda: (root / 'dist/index.html').read_bytes() == site_page)
+    check('只更新网站：桌面版本页面与清单不变', lambda: (root / 'dist/desktop/releases/1.1.0/standalone.html').read_bytes() == PAGE and (root / 'dist/desktop/latest.json').read_bytes() == manifest)
+    check('只更新网站：发布目录字节不变', lambda: frozen == {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in release.iterdir()})
+    check('只更新网站：包含后台文件', lambda: all((root / 'dist' / name).exists() for name in TOOLS['ADMIN_FILES']))
+    check('只更新网站：只校验模式通过', lambda: prepare_site(root, True) == release)
+    (root / 'dist/index.html').write_bytes(PAGE)
+    check('只更新网站：校验拒绝旧首页', lambda: rejects(lambda: prepare_site(root, True)))
+    (root / 'standalone.html').write_bytes(b'not HTML')
+    check('只更新网站：拒绝非 HTML 页面', lambda: rejects(lambda: prepare_site(root)))
+
+
 def preparation_checks(root):
     prepare = TOOLS['prepare']
     release = prepare(root)
@@ -253,6 +274,11 @@ args=sys.argv[1:]
 with open(os.environ['TEST_PUBLISH_LOG'],'a') as f:f.write(name+':'+json.dumps(args)+'\\n')
 case=os.environ['TEST_PUBLISH_CASE']
 if name=='npx':raise SystemExit(0)
+if name=='curl':
+ target=args[args.index('-o')+1]
+ data=Path(os.environ['TEST_PUBLISH_MANIFEST']).read_bytes()
+ Path(target).write_bytes(data+(b' ' if case=='site-only-drift' else b''))
+ raise SystemExit(0)
 if args[:2]==['auth','status']:raise SystemExit(2 if case=='unauthenticated' else 0)
 if args[:2]==['repo','view']:print('true' if case=='private' else 'false');raise SystemExit(0)
 if args[:2]==['release','view']:raise SystemExit(0 if case=='existing' else 1)
@@ -266,24 +292,30 @@ if args and args[0]=='api':
  print(json.dumps(d));raise SystemExit(0)
 raise SystemExit(99)
 '''
-    for name in ('gh', 'npx'):
+    for name in ('gh', 'npx', 'curl'):
         path = root / 'bin' / name
         path.write_text(shim)
         path.chmod(0o755)
-    for case in ('success', 'existing', 'unauthenticated', 'private', 'upload-failure', 'bad-digest', 'missing-digest', 'draft', 'deploy-only'):
+    for case in ('success', 'existing', 'unauthenticated', 'private', 'upload-failure', 'bad-digest', 'missing-digest', 'draft', 'deploy-only', 'site-only', 'site-only-drift'):
         def run(case=case):
             log = root / 'calls.log'
             log.write_text('')
             env = dict(os.environ, PATH=str(root / 'bin') + os.pathsep + os.environ['PATH'],
-                       TEST_PUBLISH_LOG=str(log), TEST_PUBLISH_REMOTE=str(remote), TEST_PUBLISH_CASE=case)
-            result = subprocess.run(['bash', str(root / 'desktop/publish_release.sh'), *(['--deploy-only'] if case == 'deploy-only' else [])],
+                       TEST_PUBLISH_LOG=str(log), TEST_PUBLISH_REMOTE=str(remote), TEST_PUBLISH_CASE=case,
+                       TEST_PUBLISH_MANIFEST=str(release / 'latest.json'))
+            mode = ['--deploy-only'] if case == 'deploy-only' else ['--site-only'] if case.startswith('site-only') else []
+            result = subprocess.run(['bash', str(root / 'desktop/publish_release.sh'), *mode],
                                     cwd=root, env=env, text=True, capture_output=True, timeout=30)
             calls = log.read_text().splitlines()
             deployed = any(line.startswith('npx:') for line in calls)
-            expected = case in ('success', 'deploy-only')
+            expected = case in ('success', 'deploy-only', 'site-only')
             if deployed != expected or (result.returncode == 0) != expected:
                 raise AssertionError(f'exit={result.returncode}; calls={calls}; stderr={result.stderr}')
-            if expected:
+            if case.startswith('site-only'):
+                assert not any(line.startswith('gh:') for line in calls), calls
+                if expected:
+                    assert next(i for i, line in enumerate(calls) if line.startswith('curl:')) < next(i for i, line in enumerate(calls) if line.startswith('npx:'))
+            elif expected:
                 assert next(i for i, line in enumerate(calls) if '"api"' in line) < next(i for i, line in enumerate(calls) if line.startswith('npx:'))
             if case == 'deploy-only':
                 assert not any('"create"' in line or '"edit"' in line for line in calls)
@@ -302,6 +334,9 @@ def main():
             create_fixture(root)
             config_checks(root)
             preparation_checks(root)
+            site_root = base / 'site'
+            site_root.mkdir()
+            site_only_checks(site_root)
             write_config(root, CONFIG)
             size_checks(root)
             publisher = base / 'publish'

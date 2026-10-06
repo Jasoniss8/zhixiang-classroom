@@ -233,11 +233,11 @@ def site_files(root):
     return {name: regular_file(root / name).read_bytes() for name in ADMIN_FILES}
 
 
-def verify_dist(directory, config, payload, site):
+def verify_dist(directory, config, payload, site, index=None):
     version = config['version']
     expected = {
         **site,
-        'index.html': payload['standalone.html'],
+        'index.html': index or payload['standalone.html'],
         'desktop/latest.json': payload['latest.json'],
         f'desktop/releases/{version}/standalone.html': payload['standalone.html'],
         '_headers': HEADERS.encode('utf-8'),
@@ -255,7 +255,7 @@ def verify_dist(directory, config, payload, site):
                 raise ValueError(f'dist 出现不在发布白名单的文件：{name}')
 
 
-def stage_dist(root, config, payload, site):
+def stage_dist(root, config, payload, site, index=None):
     destination = root / 'dist'
     if destination.is_symlink():
         raise ValueError('dist 不允许符号链接。')
@@ -282,14 +282,14 @@ def stage_dist(root, config, payload, site):
         page = temporary / 'desktop/releases' / version / 'standalone.html'
         page.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(payload['standalone.html'], page)
-        shutil.copyfile(payload['standalone.html'], temporary / 'index.html')
+        shutil.copyfile(index or payload['standalone.html'], temporary / 'index.html')
         (temporary / 'desktop/latest.json').write_bytes(payload['latest.json'])
         (temporary / '_headers').write_text(HEADERS, encoding='utf-8')
         (temporary / '_redirects').write_text(REDIRECTS, encoding='utf-8')
         for name, data in site.items():
             (temporary / name).parent.mkdir(parents=True, exist_ok=True)
             (temporary / name).write_bytes(data)
-        verify_dist(temporary, config, payload, site)
+        verify_dist(temporary, config, payload, site, index)
         if destination.exists():
             backup = Path(tempfile.mkdtemp(prefix='.release-dist-backup-', dir=root))
             backup.rmdir()
@@ -308,15 +308,41 @@ def stage_dist(root, config, payload, site):
             shutil.rmtree(backup)
 
 
-def prepare(root=ROOT, verify_only=False):
-    root = Path(root).resolve()
-    config = read_config(root)
+def read_page(root):
     page_path = regular_file(root / 'standalone.html')
     check_file_size(page_path, MAX_PAGE_BYTES, '页面')
     page = page_path.read_bytes()
     page.decode('utf-8')
     if not re.match(r'^\s*<!doctype html>', page[:512].decode('utf-8', errors='ignore'), re.IGNORECASE):
         raise ValueError('standalone.html 缺少标准 HTML 文档开头，桌面更新器会拒绝。')
+    return page_path, page
+
+
+def prepare_site(root=ROOT, verify_only=False):
+    """Website-only update: new home page and admin files. The published
+    desktop release (manifest, versioned page, packages) is reused unchanged."""
+    root = Path(root).resolve()
+    config = read_config(root)
+    page_path, _ = read_page(root)
+    directory = root / 'output/releases' / ('v' + config['version'])
+    if directory.is_symlink() or not directory.is_dir():
+        raise ValueError(f'缺少已发布版本目录 {directory.name}；只更新网站时必须保留当前桌面版本的发布文件。')
+    payload = {
+        'standalone.html': regular_file(directory / 'standalone.html'),
+        'latest.json': regular_file(directory / 'latest.json').read_bytes(),
+    }
+    site = site_files(root)
+    if verify_only:
+        verify_dist(root / 'dist', config, payload, site, page_path)
+    else:
+        stage_dist(root, config, payload, site, page_path)
+    return directory
+
+
+def prepare(root=ROOT, verify_only=False):
+    root = Path(root).resolve()
+    config = read_config(root)
+    page_path, page = read_page(root)
     packages = {'macos': root / 'output/macos/知象-macOS.zip', 'windows': root / 'output/windows/知象-Windows-免安装.zip'}
     verify_native_packages(config, page, packages)
     manifest = manifest_for(config, page_path, packages)
@@ -351,9 +377,10 @@ def prepare(root=ROOT, verify_only=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--verify-only', action='store_true', help='verify prepared assets and dist without changing files')
+    parser.add_argument('--site-only', action='store_true', help='update only the website home page and admin; keep the published desktop release')
     args = parser.parse_args()
     try:
-        directory = prepare(verify_only=args.verify_only)
+        directory = (prepare_site if args.site_only else prepare)(verify_only=args.verify_only)
     except (OSError, ValueError, KeyError, TypeError, BadZipFile) as error:
         print(f'发布准备未完成：{error}', file=sys.stderr)
         return 1

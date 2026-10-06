@@ -491,7 +491,8 @@ python3 tools/hash-password.py
 
 1. 在 Cloudflare 控制台 → Workers 和 Pages → `zhixiang-classroom` → 设置 → 绑定，添加 D1 数据库，变量名填 `DB`，选 `zhixiang-analytics`。
 2. 同一项目 → 设置 → 变量和机密，添加两个“密钥”类型变量：`ADMIN_PASSWORD_HASH`、`SESSION_SECRET`，值取自 `hash-password.py` 的输出。密码建议至少 12 个字符；改密码时重新运行脚本并替换 `ADMIN_PASSWORD_HASH`。
-3. 重新部署后打开 `https://zhixiang-classroom.pages.dev/admin/`。
+3. 只更新网站（不发新桌面版）：`bash desktop/publish_release.sh --site-only`。它用当前 `standalone.html` 作为网站首页并加入 `admin/` 与 `functions/`；桌面更新清单和 `desktop/releases/<version>/` 页面沿用 `output/releases/v<version>/` 中已发布的文件，部署前与线上清单逐字节比对，不一致则停止；不访问 GitHub。之后网站首页可以比桌面版本新，下次完整发版时两者重新一致。
+4. 部署后打开 `https://zhixiang-classroom.pages.dev/admin/`。
 
 ### 本地预览与测试
 
