@@ -39,6 +39,8 @@
 
 首轮Windows CI在ZIP生成后输出中文路径时因cp1252编码失败，程序启动检查未运行；已改构建日志为UTF-8，最终以修复提交的CI结果为准。该修复不改变页面和程序内容。
 
+第二轮Windows CI已实际打开28模型及桌面桥接，测试脚本误把数值输入框选择为滑块属性而停止；已修正定位和change事件，并检查实际参数值及保存内容。该轮4/5不记作通过。
+
 ## 发布与安装
 
 [网站](https://zhixiang-classroom.pages.dev/) · [下载页](https://zhixiang-classroom.pages.dev/#downloads) · [1.2.0发布资产](https://github.com/Jasoniss8/zhixiang-classroom/releases/tag/v1.2.0) · [更新清单](https://zhixiang-classroom.pages.dev/desktop/latest.json) · [CI](https://github.com/Jasoniss8/zhixiang-classroom/actions/workflows/test.yml)

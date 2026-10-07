@@ -24,16 +24,19 @@ function check(name,value,details){results.push({name,passed:!!value,details});c
     await page.locator("#formula").waitFor();
     check(id+" actual renderer formula and controls",await page.locator("#formula").textContent()!=="" && await page.locator("[data-param]").count()>0);
     check(id+" defaults stay paused",await page.evaluate(()=>!state.running));
-    const number=page.locator("input[type=number][data-param]").first();
+    const number=page.locator("input[type=number][data-param-number]").first();
+    const key=await number.getAttribute("data-param-number");
     const max=Number(await number.getAttribute("max")),min=Number(await number.getAttribute("min"));
-    await number.fill(String((min+max)/2));await number.dispatchEvent("input");
-    check(id+" parameter input renders",await page.locator("#formula").textContent()!=="");
+    const value=(min+max)/2;
+    await number.fill(String(value));await number.dispatchEvent("change");
+    check(id+" parameter input renders and updates state",await page.locator("#formula").textContent()!=="" && await page.evaluate(({key,value})=>state.p[key]===value,{key,value}));
   }
   await page.evaluate(()=>openModel("taylor"));
   await page.locator('[data-action="save"]').click();
   await page.locator("#classTitle").fill("Windows CI university");
   await page.locator('[data-action="confirm-save"]').click();
   const saved=await page.evaluate(()=>localStorage.getItem("zhixiang-lab-v1"));
+  check("classroom saved through actual UI",JSON.parse(saved)?.classes.some(c=>c.title==="Windows CI university" && c.model==="taylor"));
   await page.reload();await page.waitForFunction(()=>typeof MODELS!=="undefined");
   check("classroom persists after reload",await page.evaluate(saved=>localStorage.getItem("zhixiang-lab-v1")===saved,saved));
   await page.screenshot({path:path.join(outputDir,"windows-university-packaged.png")});
