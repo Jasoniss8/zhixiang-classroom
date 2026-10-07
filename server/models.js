@@ -109,5 +109,35 @@ export const MODELS = Object.freeze([
     "id": "seasons",
     "cat": "geography",
     "title": "地球公转与四季"
+  },
+  {
+    "id": "taylor",
+    "cat": "math",
+    "title": "泰勒展开与近似误差"
+  },
+  {
+    "id": "linear-transform",
+    "cat": "math",
+    "title": "矩阵与线性变换"
+  },
+  {
+    "id": "fourier",
+    "cat": "math",
+    "title": "傅里叶级数与谐波合成"
+  },
+  {
+    "id": "gradient",
+    "cat": "math",
+    "title": "偏导数、梯度与切平面"
+  },
+  {
+    "id": "ode",
+    "cat": "math",
+    "title": "一阶微分方程与方向场"
+  },
+  {
+    "id": "rlc",
+    "cat": "physics",
+    "title": "串联RLC电路与共振"
   }
 ]);

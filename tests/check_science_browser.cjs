@@ -9,8 +9,8 @@ const check=(name,passed,details)=>{results.push({name,passed:!!passed,details})
  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
  const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url())&&!r.url().startsWith((require('./runtime.cjs').baseURL + '/')))remote.push(r.url());});
  await page.goto((require('./runtime.cjs').baseURL + '/index.html?qa=science'));
- check('22 个模型全部保留',await page.locator('.model-card').count()===22);
- for(const [cat,count] of[['math',8],['physics',12],['geography',2]]){await page.locator('[data-filter='+cat+']').click();check(cat+' 分类数量',await page.locator('.model-card').count()===count);}
+ check('28 个模型全部保留',await page.locator('.model-card').count()=== 28);
+ for(const [cat,count] of[['math',13],['physics',13],['geography',2]]){await page.locator('[data-filter='+cat+']').click();check(cat+' 分类数量',await page.locator('.model-card').count()===count);}
  await page.locator('[data-filter=all]').click();await page.locator('#gradeFilter').selectOption('高中');await page.locator('#searchInput').fill('圆周');
  check('高中筛选可找到圆周运动',await page.locator('.model-card').count()===1);await page.locator('[data-open=circular]').click();
  const fill=async(key,value)=>{await page.locator('#number-'+key).fill(String(value));await page.locator('#number-'+key).press('Tab');};

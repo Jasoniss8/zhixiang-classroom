@@ -176,7 +176,7 @@ async function adminStats() {
   check('stats 汇总数值', res.status === 200 && s.totals.views === 4 && s.totals.visitors === 3 && s.totals.opens === 3 && s.totals.present === 1, s.totals);
   check('stats 上一时段对比', s.totals.previous.views === 1 && s.totals.previous.visitors === 1, s.totals.previous);
   check('stats 趋势按日补零共 7 点', s.trend.length === 7 && s.trend[6].label === dayKey(now) && s.trend[6].views === 3 && s.trend[6].opens === 2 && s.trend[5].views === 1 && s.trend[0].views === 0, s.trend);
-  check('stats 模型排行含全部模型并排序', s.models.length === 22 && s.models[0].id === 'projectile' && s.models[0].opens === 2 && s.models[0].title === '平抛与斜抛运动' && s.models[1].id === 'lens');
+  check('stats 模型排行含全部模型并排序', s.models.length === 28 && s.models[0].id === 'projectile' && s.models[0].opens === 2 && s.models[0].title === '平抛与斜抛运动' && s.models[1].id === 'lens');
   check('stats 功能列出全部白名单', s.features.find((f) => f.name === 'present').count === 1 && s.features.length === 9);
   check('stats 来源与直接访问', s.referrers.length === 2 && s.direct === 2, { r: s.referrers, d: s.direct });
   check('stats 设备', s.devices.desktop === 1 && s.devices.mobile === 2 && s.devices.tablet === 1, s.devices);

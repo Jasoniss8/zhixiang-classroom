@@ -1156,7 +1156,7 @@ function renderLegacyControls() {
     renderMathControls();
     return;
   }
-  if (m.threeD) {
+  if (m.threeD && m.geometryUI !== false) {
     renderGeometryControls();
     return;
   }
@@ -1193,7 +1193,7 @@ function renderLegacyControls() {
 
 function setLegacyParam(key, value) {
   if (
-    state.model?.threeD ||
+    (state.model?.threeD && state.model.geometryUI !== false) ||
     ["circular", "seasons", "collision", "induction"].includes(state.model?.id)
   )
     stopAnimation();
@@ -1280,7 +1280,7 @@ function setLegacyParam(key, value) {
   normalizeGeometryParams(m, state.p);
   normalizeSpringParams(m, state.p);
   syncParam(key);
-  if (m.threeD) syncGeometrySelections(m, state.p);
+  if (m.threeD && m.geometryUI !== false) syncGeometrySelections(m, state.p);
   if (m.id === "projectile" && key === "strobeInterval") {
     renderReadout();
     requestDraw();
@@ -1336,7 +1336,7 @@ function resetLegacySolver() {
 
 function advanceLegacyModel(dt) {
   if (!state.model) return;
-  if (state.model.threeD) {
+  if (state.model.threeD && state.model.geometryUI !== false) {
     geometryTick(dt);
     return;
   }

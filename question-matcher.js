@@ -1,10 +1,11 @@
 /* Single-question matching only. No network, OCR, code evaluation or general solver. */
 (function (root, factory) {
   "use strict";
-  const api = factory();
+  const university = typeof module === 'object' && module.exports ? require('./university-questions.js') : root.ZhixiangUniversityQuestions;
+  const api = factory(university);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.ZhixiangQuestions = api;
-})(typeof window === "object" ? window : globalThis, function () {
+})(typeof window === "object" ? window : globalThis, function (university) {
   "use strict";
   const MAX_TEXT_LENGTH = 4000;
   const number = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?";
@@ -46,6 +47,8 @@
       fields: [numericField("a", "二次项系数 a", "", -3, 3), numericField("h", "顶点横坐标 h", "", -5, 5), numericField("k", "顶点纵坐标 k", "", -4, 5)],
     },
   ];
+  types.push(...(university?.types || []));
+  const fieldsFor = (id, values) => university?.types.some(t => t.id === id) ? university.fieldsFor(id, values) : (types.find(t => t.id === id)?.fields || []);
   function normalize(text) {
     return text.replace(/²/g, "^2").replace(/³/g, "^3").normalize("NFKC")
       .replace(/[−–—﹣]/g, "-").replace(/[×·]/g, "*").replace(/[÷]/g, "/")
@@ -96,11 +99,11 @@
     return fragments ? fragments.join("；") : "未明确待求内容；此入口仅匹配模型和参数。";
   }
   function detect(text) {
-    const found = [];
+    const found = university?.detect(text) || [];
     if (/透镜|物距|像距/.test(text)) found.push("lens");
     if (/平抛|水平抛出|水平投出|水平射出|斜抛|抛体/.test(text)) found.push("projectile");
     if (/碰撞|正碰|恢复系数|粘在一起|黏在一起/.test(text)) found.push("collision");
-    if (/二次函数|抛物线|(?:\by|f\s*\(\s*x\s*\))\s*=/i.test(text) && !found.includes("projectile")) found.push("parabola");
+    if (/二次函数|抛物线|(?:\by|f\s*\(\s*x\s*\))\s*=/i.test(text) && !found.length) found.push("parabola");
     return found;
   }
   function lens(result, text) {
@@ -239,15 +242,18 @@
     result.typeId = selected;
     result.modelId = selected;
     if (typeId !== "auto" && detected.length && !detected.includes(typeId)) add(result.issues, "所选题型与题干不一致，请修改题干或重新选择。" );
-    if (/(?:第[二三四五六七八九十2-9]题|第二问|另一道题|\(2\)|(?:^|\s)2[.、)])/u.test(normalized)) add(result.issues, "请一次只输入一道题，暂不处理多题或多情景组合。" );
+    const combinationText = selected === "ode" ? normalized.replace(/y\s*\(\s*[+\-\d.eE]+\s*\)/g, "y(t)") : normalized;
+    if (/(?:第[二三四五六七八九十2-9]题|第二问|另一道题|\(2\)|(?:^|\s)2[.、)])/u.test(combinationText)) add(result.issues, "请一次只输入一道题，暂不处理多题或多情景组合。" );
     if (/如图|图中|图示|见图/.test(normalized)) add(result.warnings, "题干引用了图示，当前只识别文字；请核对图中的条件是否已完整补入。" );
     if (/<\/?(?:script|iframe|img|svg)|javascript:|\beval\s*\(|\brequire\s*\(|=>|\bfunction\s*\(/i.test(normalized)) add(result.issues, "输入包含不支持的代码或标记，请仅保留题目文字与数学式。" );
-    ({ lens, projectile, collision, parabola })[selected](result, normalized);
-    const missing = types.find(t => t.id === selected).fields.filter(f => !Object.hasOwn(result.values, f.key)).map(f => f.label);
+    if (university?.types.some(t => t.id === selected)) university.analyze(selected, normalized, result);
+    else ({ lens, projectile, collision, parabola })[selected](result, normalized);
+    const missing = fieldsFor(selected, result.values).filter(f => !f.optional && !Object.hasOwn(result.values, f.key)).map(f => f.label);
     if (missing.length) add(result.warnings, `自动识别未提取：${missing.join("、")}。请在条件栏补填并核对。`);
     return result;
   }
   function validate(typeId, values) {
+    if (university?.types.some(t => t.id === typeId)) return university.validate(typeId, values);
     const result = { ok: false, errors: [], params: {}, notes: [] };
     const type = types.find(t => t.id === typeId);
     if (!type) { result.errors.push("请选择支持的题型。"); return result; }
@@ -280,5 +286,5 @@
     if (!result.ok) result.params = {};
     return result;
   }
-  return { MAX_TEXT_LENGTH, types, analyze, validate };
+  return { MAX_TEXT_LENGTH, types, analyze, validate, fieldsFor, steps: (id,values) => university?.steps(id,values) || [], variationKeys: (id,values,params) => university?.variationKeys(id,values,params) || Object.keys(params || {}) };
 });

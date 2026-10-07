@@ -14,9 +14,9 @@ function matched(text, id, expected) {
   return r.typeId === id && !r.issues.length && v.ok && Object.entries(expected).every(([k, x]) => typeof x === 'number' ? close(v.params[k], x) : v.params[k] === x);
 }
 function rejected(text, type = 'auto') { const r = q.analyze(text, type); return Boolean(r.issues.length) || !q.validate(r.typeId, r.values).ok; }
-check('API包含四种题型且modelId固定', q.types.length === 4 && q.types.every(t => t.id === t.modelId && t.fields.length && t.example && t.scope));
+check('API保留四种旧题型并增加六种大学题型', q.types.length === 10 && q.types.filter(t=>!t.university).length === 4 && q.types.every(t => t.id === t.modelId && t.fields.length && t.example && t.scope));
 check('浏览器UMD暴露相同API', (() => {const s = {window:{}}; vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../question-matcher.js'), 'utf8'), s); return s.window.ZhixiangQuestions.types.length === 4;})());
-for (const t of q.types) {
+for (const t of q.types.filter(t=>!t.university)) {
   const r = q.analyze(t.example), v = q.validate(r.typeId, r.values);
   check(`内置${t.title}例题完整可映射`, r.typeId === t.id && !r.issues.length && v.ok, {r,v});
   check(`${t.title}每个提取字段有来源`, Object.keys(r.values).every(k => typeof r.sources[k] === 'string' && r.sources[k].length > 0));
@@ -104,7 +104,7 @@ check('不读取原型链题设', !q.validate('lens',Object.create({kind:'convex
 check('不允许任意select值', !q.validate('lens',{kind:'constructor',focal:10,objectDistance:30}).ok);
 check('额外字段不能注入模型', (()=>{const r=q.validate('lens',{kind:'convex',focal:10,objectDistance:30,objectHeight:999,onload:'evil'});return r.ok&&!Object.hasOwn(r.params,'objectHeight')&&!Object.hasOwn(r.params,'onload');})());
 check('保留4位以后合法精度', (()=>{const x=10.1234567890123,r=q.validate('lens',{kind:'convex',focal:x,objectDistance:30.987654321});return r.ok&&r.params.focal===x&&r.params.objectDistance===30.987654321;})());
-check('所有数值边界均严格检查不夹取', q.types.every(t=>t.fields.filter(f=>f.type==='number').every(f=>{const base=q.analyze(t.example).values;return !q.validate(t.id,{...base,[f.key]:f.min-1}).ok&&!q.validate(t.id,{...base,[f.key]:f.max+1}).ok;})));
+check('所有数值边界均严格检查不夹取', q.types.filter(t=>!t.university).every(t=>t.fields.filter(f=>f.type==='number').every(f=>{const base=q.analyze(t.example).values;return !q.validate(t.id,{...base,[f.key]:f.min-1}).ok&&!q.validate(t.id,{...base,[f.key]:f.max+1}).ok;})));
 check('解析不修改调用者的条件对象', (()=>{const values={kind:'convex',focal:10,objectDistance:30},before=JSON.stringify(values);q.validate('lens',values);return JSON.stringify(values)===before;})());
 let seed=20261006;const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32);
 let randomQuadratics=true,maxError=0,randomUnits=true;

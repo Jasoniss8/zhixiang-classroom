@@ -751,6 +751,17 @@ html:not([data-support-ready]) [data-action="support"]{display:none!important}
 
 /* Additional math models use the existing panels, colours and controls. */
 .advanced-layout .stage{height:470px}
+.uni-select-label{display:block;margin:14px 0 6px;font-size:12px;color:var(--muted)}
+.model-taylor .stage,.model-fourier .stage,.model-rlc .stage{height:620px}
+.model-linear-transform .stage,.model-ode .stage{height:490px}
+.model-gradient .stage{height:570px}
+body.presenting :is(.model-taylor,.model-fourier,.model-gradient,.model-ode,.model-rlc,.model-linear-transform) .stage{min-height:540px;height:calc(100vh - 290px)}
+@media(max-width:760px){
+ .model-taylor .stage,.model-fourier .stage,.model-gradient .stage,.model-rlc .stage{height:760px}
+ .model-linear-transform .stage{height:480px}
+ .model-ode .stage{height:480px}
+ body.presenting :is(.model-taylor,.model-fourier,.model-gradient,.model-rlc,.model-linear-transform) .stage{min-height:720px}
+}
 .advanced-layout .formula-text{font-size:20px;line-height:1.65}
 .advanced-layout .metric strong{font-size:16px;line-height:1.6}
 .advanced-derivative .param-value input{width:116px}
@@ -940,3 +951,8 @@ body.presenting .science-double-slit .stage{min-height:555px}
 @media(min-width:521px) and (max-width:980px){.question-layout{grid-template-columns:1fr}}
 @media(max-width:760px){.question-layout{grid-template-columns:1fr}.question-result-panel{scroll-margin-top:15px}.question-input-panel,.question-result-panel{padding:20px}}
 @media(max-width:520px){.question-context{padding:15px}.question-context-heading{align-items:flex-start}.question-context-heading>div{justify-content:flex-end}.question-context-heading .button{font-size:12px;padding:6px 8px}.question-fields{gap:16px 12px}.question-input-meta{gap:12px}}
+
+.question-calculation-steps{padding-left:22px;margin:12px 0;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+.question-calculation-steps li{margin:10px 0}
+.question-calculation-steps h3{font-size:13px;margin:0 0 4px}
+.question-calculation-steps p{margin:3px 0;white-space:pre-wrap}

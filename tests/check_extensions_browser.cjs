@@ -11,7 +11,7 @@ const results=[],errors=[],remote=[];const check=(name,passed,details)=>{results
  const fill=async(key,value)=>{await page.locator('#number-'+key).fill(String(value));await page.locator('#number-'+key).press('Tab');await draw();};
  const capture=async name=>{await page.evaluate(()=>{document.activeElement?.blur();window.scrollTo({top:0,behavior:'instant'});});await draw();await page.screenshot({path:path.join(out,name+'.png'),fullPage:true});};
  const snapshot=()=>page.evaluate(()=>JSON.stringify([state.time,state.theta,state.omega,state.idealTheta,state.idealOmega,state.oscillator,state.pendulumHistory,state.springHistory]));
- check('保留 21 个模型并在折射旁新增透镜；共 22 个',await page.locator('.model-card').count()===22&&await page.evaluate(()=>MODELS.findIndex(m=>m.id==='lens')===MODELS.findIndex(m=>m.id==='refraction')+1));
+ check('保留 21 个模型并在折射旁新增透镜；共 28 个',await page.locator('.model-card').count()=== 28&&await page.evaluate(()=>MODELS.findIndex(m=>m.id==='lens')===MODELS.findIndex(m=>m.id==='refraction')+1));
  await page.locator('#searchInput').fill('三视图');check('三视图可以搜索到现有常见几何体',await page.locator('[data-open=solids]').count()===1);
  await open('solids');await page.locator('#geo-study').selectOption('views');check('新增观察内容放在原参数栏，保留工具栏',await page.locator('.geo-view').count()===4&&await page.locator('#solidSelect option').count()===8);
  for(const shape of['cube','cuboid','prism','tetra','pyramid','cylinder','cone','sphere']){await page.locator('#solidSelect').selectOption(shape);await draw();check(shape+' 三视图可渲染',await page.evaluate(()=>stageInfo.study==='views'&&!/NaN|Infinity/.test($('#metrics').innerText)));}

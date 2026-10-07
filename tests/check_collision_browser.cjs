@@ -9,7 +9,7 @@ const check=(name,passed,details)=>{results.push({name,passed:!!passed,details})
  const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true}),page=await context.newPage();
  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url())&&!r.url().startsWith((require('./runtime.cjs').baseURL + '/')))remote.push(r.url());});
  await page.goto((require('./runtime.cjs').baseURL + '/index.html?qa=collision'));
- check('新增后 22 个模型、物理 12 个',await page.locator('.model-card').count()===22&&await page.locator('[data-category=physics] small').innerText()==='12');
+ check('新增后 28 个模型、物理 13 个',await page.locator('.model-card').count()=== 28&&await page.locator('[data-category=physics] small').innerText()==='13');
  await page.locator('[data-filter=physics]').click();await page.locator('#gradeFilter').selectOption('高中');await page.locator('#searchInput').fill('动量');
  check('物理、高中和动量搜索可找到新模型',await page.locator('.model-card').count()===1);await page.locator('[data-open=collision]').click();
  const fill=async(key,value)=>{await page.locator('#number-'+key).fill(String(value));await page.locator('#number-'+key).press('Tab');};

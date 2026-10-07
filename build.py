@@ -12,10 +12,18 @@ def write_server_models(root: Path, modules: list) -> None:
     models = []
     for name in modules:
         source = (root / 'models' / (name + '.js')).read_text(encoding='utf-8')
-        start = source.index('ZhixiangModels.register(')
+        registration = re.search(r'ZhixiangModels\.register\(\s*([A-Za-z_$][\w$]*)?\s*', source)
+        if not registration:
+            raise ValueError(f'models/{name}.js is missing registration')
+        metadata = source[registration.end():]
+        if registration.group(1):
+            declaration = re.search(r'\b(?:const|let)\s+' + re.escape(registration.group(1)) + r'\s*=\s*\{', source)
+            if not declaration:
+                raise ValueError(f'models/{name}.js has no static model metadata')
+            metadata = source[declaration.end():registration.start()]
         fields = {}
         for key in ('id', 'cat', 'title'):
-            found = re.search(rf'^\s*{key}:\s*"([^"]+)"', source[start:], re.M)
+            found = re.search(rf'(?:^|[,{{\n])\s*{key}:\s*"([^"]+)"', metadata, re.M)
             if not found:
                 raise ValueError(f'models/{name}.js is missing {key}')
             fields[key] = found.group(1)
@@ -43,11 +51,12 @@ def build(destination: Path) -> Path:
     if len(set(modules)) != len(modules) or any(not re.fullmatch(r'[a-z][a-z0-9-]*', name) for name in modules):
         raise ValueError('Invalid or duplicate model manifest entry')
     write_server_models(root, modules)
-    scripts = ['model-registry.js', 'geometry.js', 'physics.js']
+    scripts = ['model-registry.js', 'geometry.js', 'physics.js', 'university-math.js', 'university-dynamics.js']
     if (root / 'models/shared.js').is_file():
         scripts.append('models/shared.js')
+    scripts.append('models/university-shared.js')
     scripts += ['models/' + name + '.js' for name in modules]
-    scripts += ['vendor/qr.js', 'sharing.js', 'accessibility.js', 'chart-export.js', 'desktop-version.js', 'desktop-ui.js', 'question-matcher.js', 'question-ui.js', 'analytics.js', 'app.js']
+    scripts += ['vendor/qr.js', 'sharing.js', 'accessibility.js', 'chart-export.js', 'desktop-version.js', 'desktop-ui.js', 'university-questions.js', 'question-matcher.js', 'question-ui.js', 'analytics.js', 'app.js']
     index = root / 'index.html'
     html = index.read_text(encoding='utf-8')
     block = '<!-- scripts:start -->\n' + '\n'.join('<script src="' + name + '"></script>' for name in scripts) + '\n<!-- scripts:end -->'

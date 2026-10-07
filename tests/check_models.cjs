@@ -58,12 +58,12 @@ async function checkCancelledFullscreenRequest() {
   page.on('pageerror', e => errors.push(e.message));
   page.on('request', r => { if (/^https?:/.test(r.url()) && !r.url().startsWith((require('./runtime.cjs').baseURL + '/'))) remoteRequests.push(r.url()); });
   await page.goto((require('./runtime.cjs').baseURL + '/index.html?qa=current'));
-  check('首页保留原有21个并新增透镜成像', await page.locator('.model-card').count() === 22);
+  check('首页保留22个旧模型并新增6个大学模型', await page.locator('.model-card').count() === 28);
   check('移除重复推荐条、标签与课堂脚本', await page.locator('.collection-bar,.card-chip,.control-tab,.hero').count() === 0);
   await page.locator('#threeDFilter').check();
-  check('只看三维为3个模块', await page.locator('.model-card').count() === 3);
+  check('只看三维为4个模块', await page.locator('.model-card').count() === 4);
   await page.locator('#threeDFilter').uncheck();
-  for (const [cat,count] of [['math',8],['physics',12],['geography',2],['all',22]]) {
+  for (const [cat,count] of [['math',13],['physics',13],['geography',2],['all',28]]) {
     await page.locator(`[data-filter="${cat}"]`).click();
     check(`学科筛选${cat}`, await page.locator('.model-card').count() === count);
   }
@@ -200,7 +200,7 @@ async function checkCancelledFullscreenRequest() {
     const variants=await page.evaluate(()=>state.model.id==='functions'?Object.keys(FUNCTIONS):state.model.choices?.shape||[null]);
     for(const variant of variants){
       await page.evaluate(v=>{if(v){state.p[state.model.id==='functions'?'kind':'shape']=v;renderControls();}drawStage();},variant);
-      const controls=await page.evaluate(()=>state.model.threeD?geoVisibleControls(state.model,state.p):state.model.controls);
+      const controls=await page.evaluate(()=>state.model.threeD&&state.model.geometryUI!==false?geoVisibleControls(state.model,state.p):state.model.controls);
       for(const c of controls)for(const value of[c[3],c[4]])await page.evaluate(([k,v])=>{setParam(k,v);drawStage();},[c[0],value]);
     }
     check(`模型及边界渲染${id}`,errors.length===0,errors);
@@ -254,7 +254,7 @@ async function checkCancelledFullscreenRequest() {
   const offline=await browser.newContext({viewport:{width:390,height:844}}),offlinePage=await offline.newPage(),network=[];
   offlinePage.on('request',r=>{if(/^https?:/.test(r.url()))network.push(r.url());});offlinePage.on('pageerror',e=>errors.push(e.message));
   await offlinePage.goto('file://'+path.join(root,'standalone.html'));
-  check('单文件首页22模型',await offlinePage.locator('.model-card').count()===22);
+  check('单文件首页28模型',await offlinePage.locator('.model-card').count()=== 28);
   for(const id of ids){await offlinePage.evaluate(id=>openModel(id),id);await offlinePage.waitForTimeout(20);}
   check('单文件所有模型无需网络',network.length===0,network);
   const storagePage=await context.newPage();await storagePage.addInitScript(()=>Object.defineProperty(window,'localStorage',{get(){throw new Error('Disabled for test');}}));await storagePage.goto((require('./runtime.cjs').baseURL + '/index.html?qa=storage'));

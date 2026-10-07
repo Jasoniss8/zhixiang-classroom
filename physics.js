@@ -410,11 +410,85 @@ window.ZhixiangPhysics = (() => {
     const phi=toRad(lat),lambda=toRad(lon),epsilon=toRad(OBLIQUITY),c=Math.cos(phi),s=Math.sin(phi);
     return [c*Math.cos(lambda),c*Math.sin(lambda)*Math.cos(epsilon)+s*Math.sin(epsilon),-c*Math.sin(lambda)*Math.sin(epsilon)+s*Math.cos(epsilon)];
   }
+  // Series RLC only. UI values are mH and microfarads; all calculations use SI.
+  // Free response and established sinusoidal steady state are separate modes.
+  function rlcParameters(p) {
+    const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
+    if (!p || !['free', 'steady'].includes(p.mode) || !inRange(p.resistance, 0, 500) ||
+        !inRange(p.inductance, 10, 1000) || !inRange(p.capacitance, 1, 1000))
+      return {valid:false,message:'串联 RLC 要求 R≥0、L>0、C>0，且参数在支持范围内。'};
+    if (p.mode === 'free' && (!inRange(p.voltage0, -100, 100) || !inRange(p.current0, -10, 10)))
+      return {valid:false,message:'初始电容电压须为 −100–100 V，初始电流须为 −10–10 A。'};
+    if (p.mode === 'steady' && (p.resistance <= 0 || !inRange(p.driveVoltage, 0, 400) || !inRange(p.frequency, 1, 2000)))
+      return {valid:false,message:'正弦稳态要求 R>0；电源峰值为 0–400 V，频率为 1–2000 Hz。'};
+    const R=p.resistance,L=p.inductance*1e-3,C=p.capacitance*1e-6,
+      omega0=1/Math.sqrt(L*C),alpha=R/(2*L),criticalResistance=2*Math.sqrt(L/C),delta=omega0*omega0-alpha*alpha;
+    return {valid:true,R,L,C,omega0,f0:omega0/(2*Math.PI),alpha,criticalResistance,delta,
+      regime:Math.abs(R-criticalResistance)<=1e-10*Math.max(1,criticalResistance)?'critical':delta>0?'under':'over',
+      omegaD:delta>0?Math.sqrt(delta):null,qPeakOmega:omega0*omega0>2*alpha*alpha?Math.sqrt(omega0*omega0-2*alpha*alpha):null};
+  }
+  function rlcResponse(p, frequency=p.frequency) {
+    const d=rlcParameters(p);
+    if (!d.valid) return d;
+    if (!(Number.isFinite(frequency)&&frequency>0) || !(d.R>0) || !(Number.isFinite(p.driveVoltage)&&p.driveVoltage>=0&&p.driveVoltage<=400))
+      return {valid:false,message:'有限正弦稳态要求 R>0、频率为正且电源峰值有效。'};
+    const omega=2*Math.PI*frequency,reactance=omega*d.L-1/(omega*d.C),impedance=Math.hypot(d.R,reactance),
+      currentAmplitude=p.driveVoltage/impedance,phase=Math.atan2(reactance,d.R);
+    if (![impedance,currentAmplitude,currentAmplitude/omega].every(Number.isFinite)) return {valid:false,message:'参数使稳态幅值超出有限数值范围，请增大电阻。'};
+    return {...d,valid:true,frequency,omega,reactance,impedance,currentAmplitude,chargeAmplitude:currentAmplitude/omega,phase};
+  }
+  function rlcState(p, time) {
+    const d=rlcParameters(p);
+    if (!d.valid) return d;
+    if (!Number.isFinite(time)||time<0) return {valid:false,message:'时间须为非负有限数。'};
+    let q,current,sourceVoltage=0;
+    if (p.mode==='steady') {
+      const s=rlcResponse(p);
+      if (!s.valid) return s;
+      current=s.currentAmplitude*Math.cos(s.omega*time-s.phase);
+      q=s.chargeAmplitude*Math.sin(s.omega*time-s.phase);
+      sourceVoltage=p.driveVoltage*Math.cos(s.omega*time);
+    } else {
+      const q0=d.C*p.voltage0,i0=p.current0;
+      let cosine,sine;
+      if (d.delta>=0) {
+        const z=Math.sqrt(d.delta)*time,decay=Math.exp(-d.alpha*time),sinc=Math.abs(z)<1e-5?1-z*z/6+z**4/120:Math.sin(z)/z;
+        cosine=decay*Math.cos(z);sine=decay*time*sinc;
+      } else {
+        const beta=Math.sqrt(-d.delta),slow=-d.omega0*d.omega0/(d.alpha+beta),fast=-d.alpha-beta;
+        const eSlow=Math.exp(slow*time),eFast=Math.exp(fast*time);
+        cosine=(eSlow+eFast)/2;
+        // expm1 keeps the difference accurate arbitrarily close to critical damping.
+        sine=eSlow*(-Math.expm1(-2*beta*time))/(2*beta);
+      }
+      q=q0*cosine+(i0+d.alpha*q0)*sine;
+      current=i0*cosine-(d.alpha*i0+d.omega0*d.omega0*q0)*sine;
+    }
+    const voltageC=q/d.C,voltageR=d.R*current,voltageL=sourceVoltage-voltageR-voltageC,
+      energyL=.5*d.L*current*current,energyC=.5*q*q/d.C,energy=energyL+energyC,energyRate=sourceVoltage*current-d.R*current*current,
+      initialEnergy=p.mode==='free'?.5*d.L*p.current0*p.current0+.5*d.C*p.voltage0*p.voltage0:null,
+      dissipated=initialEnergy===null?null:Math.max(0,initialEnergy-energy);
+    if (![q,current,voltageC,voltageL,energy,energyRate].every(Number.isFinite)) return {valid:false,message:'参数使电路读数超出有限数值范围，请增大电阻。'};
+    return {...d,valid:true,time,q,current,voltageC,voltageR,voltageL,sourceVoltage,energy,energyRate,
+      energyL,energyC,initialEnergy,dissipated,currentRate:voltageL/d.L};
+  }
+  function rlcDuration(p) {
+    const d=rlcParameters(p);
+    if (!d.valid) return 1;
+    if (p.mode==='steady') return 6/p.frequency;
+    if (d.delta>0 && Math.sqrt(d.delta)>.1*d.omega0) return 12*Math.PI/Math.sqrt(d.delta);
+    if (d.delta<0) {
+      const slow=d.omega0*d.omega0/(d.alpha+Math.sqrt(-d.delta));
+      return 6/slow;
+    }
+    return 6/Math.max(d.alpha,.1*d.omega0);
+  }
   return Object.freeze({ dragRate, acceleration, projectileStep, projectilePath, samplePath, pendulumStep,
     MAX_STEP,circularTension,circularInitial,circularAdvance,circularData,
     COLLISION_GEOMETRY,collisionSolution,collisionState,
     INDUCTION_GEOMETRY,inductionEvents,inductionState,doubleSlitParameters,doubleSlitAt,doubleSlitPixelIntensity,wavelengthColor,
     lensData,lensRays,oscillatorParameters,oscillatorInitial,oscillatorAdvance,oscillatorReadings,oscillatorEnvelope,oscillatorResponse,
     COULOMB_K,CHARGE_CUTOFF,FIELD_BOUNDS,electricCharges,electricField,traceFieldLine,electricFieldLines,equipotentialContours,
-    OBLIQUITY,SOLAR_TERMS,solarPosition,daylight,seasonData,earthSurface });
+    OBLIQUITY,SOLAR_TERMS,solarPosition,daylight,seasonData,earthSurface,
+    rlcParameters,rlcResponse,rlcState,rlcDuration });
 })();

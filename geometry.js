@@ -415,7 +415,7 @@ function drawNetStage(ctx,w,h,p,thumbnail=false){
 function drawGeometryStage(ctx,w,h,p,thumbnail=false,id=state.model?.id){if(!thumbnail&&['solids','sections'].includes(id)&&p.study&&p.study!=='basic')return drawGeoStudy(ctx,w,h,p,{id});if(id==='solids')return drawSolidStage(ctx,w,h,p,thumbnail);if(id==='sections')return drawSectionStage(ctx,w,h,p,thumbnail);if(id==='nets')return drawNetStage(ctx,w,h,p,thumbnail);}
 function geometryThumb(canvas){const m=modelById(canvas.dataset.thumb),{ctx,w,h}=setupCanvas(canvas);ctx.save();ctx.translate(0,13);const p={...m.defaults,scale:m.id==='nets'?1.34:1.17,fold:45};drawGeometryStage(ctx,w,h-16,p,true,m.id);ctx.restore();}
 function geometrySyncView(){
- if(!state.model?.threeD)return;
+ if((!state.model?.threeD || state.model.geometryUI === false))return;
  if($('#geoZoomValue'))$('#geoZoomValue').textContent=`${Math.round(state.p.scale*100)}%`;
  const views={iso:[-35,state.model.id==='nets'?38:24],front:[0,0],top:[0,90],side:[90,0]};
  $$('[data-geo-view]').forEach(b=>{const v=views[b.dataset.geoView],active=Math.abs(state.p.yaw-v[0])<.2&&Math.abs(state.p.pitch-v[1])<.2;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
@@ -424,7 +424,7 @@ function geometrySyncView(){
 }
 function geoStop(){state.geoSpin=false;state.geoFold=false;state.running=false;geometrySyncView();}
 function geometryAction(action){
- if(!state.model?.threeD)return;
+ if((!state.model?.threeD || state.model.geometryUI === false))return;
  if(action==='zoom-in'||action==='zoom-out'){state.p.scale=clamp(state.p.scale+(action==='zoom-in'?.1:-.1),.55,1.8);}
  if(action==='rotate'){state.geoSpin=!state.geoSpin;state.geoFold=false;state.running=state.geoSpin;prevFrame=0;}
  if(action==='fold'&&state.model.id==='nets'){state.geoFold=!state.geoFold;state.geoSpin=false;state.geoDirection=state.p.fold>=99?-1:1;state.running=state.geoFold;prevFrame=0;}
@@ -440,11 +440,11 @@ function bindGeometryStage(){
  const pointers=new Map();let distance=0;
  const capture=e=>{try{canvas.setPointerCapture(e.pointerId);}catch{/* Synthetic test events may not have an active pointer. */}};
  const pinch=()=>{const ps=[...pointers.values()];return ps.length>=2?Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y):0;};
- canvas.addEventListener('pointerdown',e=>{if(state.inking||!state.model?.threeD||e.button>0)return;geoStop();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});capture(e);distance=pinch();canvas.style.cursor='grabbing';});
- canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId)||state.inking||!state.model?.threeD)return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size>=2){const d=pinch();if(distance>0)state.p.scale=clamp(state.p.scale*d/distance,.55,1.8);distance=d;}else{state.p.yaw=((state.p.yaw+(e.clientX-old.x)*.5+540)%360)-180;state.p.pitch=clamp(state.p.pitch+(e.clientY-old.y)*.4,-90,90);}geometrySyncView();requestDraw();});
+ canvas.addEventListener('pointerdown',e=>{if(state.inking||(!state.model?.threeD || state.model.geometryUI === false)||e.button>0)return;geoStop();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});capture(e);distance=pinch();canvas.style.cursor='grabbing';});
+ canvas.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId)||state.inking||(!state.model?.threeD || state.model.geometryUI === false))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size>=2){const d=pinch();if(distance>0)state.p.scale=clamp(state.p.scale*d/distance,.55,1.8);distance=d;}else{state.p.yaw=((state.p.yaw+(e.clientX-old.x)*.5+540)%360)-180;state.p.pitch=clamp(state.p.pitch+(e.clientY-old.y)*.4,-90,90);}geometrySyncView();requestDraw();});
  ['pointerup','pointercancel','lostpointercapture'].forEach(type=>canvas.addEventListener(type,e=>{pointers.delete(e.pointerId);distance=pinch();canvas.style.cursor=pointers.size?'grabbing':'grab';}));
- canvas.addEventListener('wheel',e=>{if(!state.model?.threeD||state.inking)return;e.preventDefault();state.p.scale=clamp(state.p.scale*Math.exp(-e.deltaY*.001),.55,1.8);geometrySyncView();requestDraw();},{passive:false});
- canvas.addEventListener('keydown',e=>{if(!state.model?.threeD)return;let used=true;if(e.key==='ArrowLeft')state.p.yaw-=5;else if(e.key==='ArrowRight')state.p.yaw+=5;else if(e.key==='ArrowUp')state.p.pitch-=5;else if(e.key==='ArrowDown')state.p.pitch+=5;else if(e.key==='+'||e.key==='=')state.p.scale+=.1;else if(e.key==='-')state.p.scale-=.1;else used=false;if(used){e.preventDefault();geoStop();state.p.yaw=((state.p.yaw+540)%360)-180;state.p.pitch=clamp(state.p.pitch,-90,90);state.p.scale=clamp(state.p.scale,.55,1.8);geometrySyncView();requestDraw();}});
+ canvas.addEventListener('wheel',e=>{if((!state.model?.threeD || state.model.geometryUI === false)||state.inking)return;e.preventDefault();state.p.scale=clamp(state.p.scale*Math.exp(-e.deltaY*.001),.55,1.8);geometrySyncView();requestDraw();},{passive:false});
+ canvas.addEventListener('keydown',e=>{if((!state.model?.threeD || state.model.geometryUI === false))return;let used=true;if(e.key==='ArrowLeft')state.p.yaw-=5;else if(e.key==='ArrowRight')state.p.yaw+=5;else if(e.key==='ArrowUp')state.p.pitch-=5;else if(e.key==='ArrowDown')state.p.pitch+=5;else if(e.key==='+'||e.key==='=')state.p.scale+=.1;else if(e.key==='-')state.p.scale-=.1;else used=false;if(used){e.preventDefault();geoStop();state.p.yaw=((state.p.yaw+540)%360)-180;state.p.pitch=clamp(state.p.pitch,-90,90);state.p.scale=clamp(state.p.scale,.55,1.8);geometrySyncView();requestDraw();}});
 }
 
 // Analytic geometry and calculus: all inputs and outputs are mathematical coordinates.

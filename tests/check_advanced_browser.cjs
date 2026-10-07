@@ -8,7 +8,7 @@ const check=(name,passed,details)=>{results.push({name,passed:!!passed,details})
  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
  const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
  await page.goto((require('./runtime.cjs').baseURL + '/index.html?qa=advanced'));
- check('数学与科学模型共22个',await page.locator('.model-card').count()===22);
+ check('数学与科学模型共28个',await page.locator('.model-card').count()=== 28);
  await page.locator('#gradeFilter').selectOption('高中');await page.locator('#searchInput').fill('圆锥曲线');
  check('高中筛选与圆锥曲线搜索',await page.locator('.model-card').count()===1);
  await page.locator('[data-open="conics"]').click();

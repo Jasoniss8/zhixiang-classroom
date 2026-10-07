@@ -102,7 +102,7 @@ function observe(page, offline = false) {
   page.setDefaultTimeout(10000);
   observe(page);
   await page.goto(baseURL + '/index.html?qa=questions');
-  check('模型库首页保留全部 22 个模型', await page.locator('.model-card').count() === 22);
+  check('模型库首页保留全部 28 个模型', await page.locator('.model-card').count() === 28);
   check('首页沿用模型库常规导航，没有上课 / 做题分段切换', await page.locator('.workspace-switch, [data-workspace]').count() === 0
     && await page.locator('.sidebar [data-nav="all"]').evaluate(el => el.classList.contains('active')));
   check('桌面做题导航位于模型库后并使用铅笔图标', await page.locator('.sidebar [data-nav="questions"]').evaluate(el =>
@@ -117,7 +117,7 @@ function observe(page, offline = false) {
   const questionRoute = new URLSearchParams(new URL(page.url()).hash.slice(1));
   check('做题路由不包含题干或外部服务', questionRoute.get('view') === 'questions'
     && [...questionRoute.keys()].every(key => ['view', 'category'].includes(key)));
-  check('四个示例入口均可见', await page.locator('[data-question-example]').count() === 4);
+  check('十个示例入口均可见', await page.locator('[data-question-example]').count() === 10);
   check('页面明确文本匹配范围、图片尚未识别及不上传', await page.locator('#questionInputNote').innerText().then(text =>
     text.includes('图片识别暂未接入') && text.includes('不上传')));
   await page.locator('#questionFile').setInputFiles({name: '一道平抛题.txt', mimeType: 'text/plain', buffer: Buffer.from(fixture.projectile.text)});

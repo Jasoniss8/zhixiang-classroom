@@ -68,7 +68,7 @@ function waitForContextDownload(context, timeoutMs = 30000) {
   await page.goto(baseURL + "/index.html");
   check(
     "模型库不主动联网检查桌面版本",
-    requests === 0 && (await page.locator(".model-card").count()) === 22,
+    requests === 0 && (await page.locator(".model-card").count()) === 28,
   );
   await page.locator(".sidebar [data-nav=downloads]").click();
   await page.locator("[data-package-download=macos]").waitFor();
@@ -290,7 +290,7 @@ function waitForContextDownload(context, timeoutMs = 30000) {
   await page.locator(".sidebar [data-nav=all]").click();
   check(
     "下载页返回模型库仍为22模型",
-    (await page.locator(".model-card").count()) === 22,
+    (await page.locator(".model-card").count()) === 28,
   );
   const native = await context.newPage();
   native.on("pageerror", (e) => errors.push(e.message));
@@ -360,7 +360,7 @@ function waitForContextDownload(context, timeoutMs = 30000) {
   await page.goto("file://" + path.join(root, "standalone.html"));
   check(
     "离线单文件仍直接运行22模型",
-    (await page.locator(".model-card").count()) === 22,
+    (await page.locator(".model-card").count()) === 28,
   );
   check("下载与更新页面无脚本异常", errors.length === 0, errors);
 })()

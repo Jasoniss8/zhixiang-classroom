@@ -232,7 +232,7 @@ function safeParams(m, p) {
   m.controls.forEach(([key, s, label, min, max, step]) => {
     if (typeof p[key] === "number" && Number.isFinite(p[key])) {
       const bounded = clamp(p[key], min, max);
-      out[key] = exactFields.some((field) => field.key === key && field.type === "number")
+      out[key] = m.keepNumericPrecision || exactFields.some((field) => field.key === key && field.type === "number")
         ? bounded : Number(bounded.toFixed(m.parsePrecision?.() ?? 4));
     }
   });
@@ -245,7 +245,7 @@ function safeParams(m, p) {
   return m.normalize ? m.normalize(out, m) : out;
 }
 const MODELS = ZhixiangModels.list();
-const GEOMETRY_MODELS = MODELS.filter((m) => m.threeD);
+const GEOMETRY_MODELS = MODELS.filter((m) => m.threeD && m.geometryUI !== false);
 function readout(m, p) {
   return m.readout(p, m);
 }
@@ -273,6 +273,7 @@ function drawStage() {
   ctx.fillRect(0, 0, w, h);
   stageInfo = null;
   state.model.draw(ctx, w, h, state.p, state.compare);
+  if (stageInfo) stageInfo.modelId = state.model.id;
   const legend = $("#comparisonLegend");
   if (legend) {
     const env = state.model.environment && isResistanceCompare(state.p);
@@ -496,7 +497,7 @@ function renderLibrary() {
       )
       .join(
         "",
-      )}</div><div class="filter-controls"><label class="three-filter"><input id="threeDFilter" type="checkbox" ${state.only3d ? "checked" : ""}>只看三维</label><select id="gradeFilter" class="grade-filter" aria-label="按学段筛选"><option value="all">全部学段</option><option value="初中">初中</option><option value="高中">高中</option></select></div></div><div class="result-row"><span id="resultCount"></span></div><div class="model-grid" id="modelGrid"></div></section>`;
+      )}</div><div class="filter-controls"><label class="three-filter"><input id="threeDFilter" type="checkbox" ${state.only3d ? "checked" : ""}>只看三维</label><select id="gradeFilter" class="grade-filter" aria-label="按学段筛选"><option value="all">全部学段</option><option value="初中">初中</option><option value="高中">高中</option><option value="大学">大学</option></select></div></div><div class="result-row"><span id="resultCount"></span></div><div class="model-grid" id="modelGrid"></div></section>`;
   if (!storageOK)
     $("#main").insertAdjacentHTML(
       "afterbegin",
@@ -609,6 +610,7 @@ function openModel(id, params = null, question = null, via = "other") {
     labels: true,
   });
   if (activeQuestion) activeQuestion.originalParams = { ...state.p };
+  stageInfo = null;
   resetSolver();
   renderDemo();
   ZhixiangAnalytics.track("model_open", { model: id, via: question ? "question" : via });
@@ -621,6 +623,7 @@ function openModel(id, params = null, question = null, via = "other") {
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 function playbackDuration() {
+  if (state.model?.playback) return state.model.playback.duration(state.p);
   return state.model.id === "collision"
     ? collisionDuration(state.p)
     : state.model.id === "induction"
@@ -628,7 +631,7 @@ function playbackDuration() {
       : projectileDuration(state.p);
 }
 function standardPlayback(m) {
-  return `${m.time ? `<button class="button primary small" id="playButton" data-action="play">${icon("play")}播放</button><button class="icon-button" data-action="step" title="${m.id === "seasons" ? "暂停并推进公转位置 0.75°" : m.id === "solar" ? "暂停并推进 1.5 分钟地方真太阳时" : "暂停并单步推进 0.05 秒"}" aria-label="暂停并单步推进">${icon("step")}</button>` : ""}<button class="icon-button" data-action="reset" title="恢复默认参数 (R)" aria-label="恢复默认参数">${icon("reset")}</button>${["projectile", "collision", "induction"].includes(m.id) ? `<input id="timeline" type="range" min="0" max="1000" step="1" value="0" aria-label="${m.id === "collision" ? "碰撞演示进度" : m.id === "induction" ? "电磁感应演示进度" : "飞行进度"}"><span class="time-label" id="timeLabel">0.00 s</span>` : m.time ? `<span class="time-label" id="timeLabel">0.00 s</span><span style="flex:1"></span>` : `<span class="note">按 R 恢复默认参数</span>`}${m.time ? `<select id="speedSelect" class="speed-select" aria-label="播放速度"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>` : ""}`;
+  return `${m.time ? `<button class="button primary small" id="playButton" data-action="play">${icon("play")}播放</button><button class="icon-button" data-action="step" title="${m.playback ? "暂停并推进一个模拟步长" : m.id === "seasons" ? "暂停并推进公转位置 0.75°" : m.id === "solar" ? "暂停并推进 1.5 分钟地方真太阳时" : "暂停并单步推进 0.05 秒"}" aria-label="暂停并单步推进">${icon("step")}</button>` : ""}<button class="icon-button" data-action="reset" title="恢复默认参数 (R)" aria-label="恢复默认参数">${icon("reset")}</button>${m.playback || ["projectile", "collision", "induction"].includes(m.id) ? `<input id="timeline" type="range" min="0" max="1000" step="1" value="0" aria-label="${m.playback ? "模拟时间进度" : m.id === "collision" ? "碰撞演示进度" : m.id === "induction" ? "电磁感应演示进度" : "飞行进度"}"><span class="time-label" id="timeLabel">0.00 s</span>` : m.time ? `<span class="time-label" id="timeLabel">0.00 s</span><span style="flex:1"></span>` : `<span class="note">按 R 恢复默认参数</span>`}${m.time ? `<select id="speedSelect" class="speed-select" aria-label="播放速度"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>` : ""}`;
 }
 function renderDemo() {
   const m = state.model;
@@ -636,7 +639,7 @@ function renderDemo() {
   ZhixiangAnalytics.view("model");
   $("#pageCrumb").textContent = (activeQuestion ? "做题" : CATS[m.cat].name) + " / " + m.title;
   $("#main").innerHTML =
-    `<section class="demo-header"><div class="demo-heading"><button class="icon-button back-button" data-action="home" aria-label="返回模型库">${icon("back")}</button><div><div class="demo-title-row"><h1>${m.title}</h1><span class="demo-tag ${m.cat}">${CATS[m.cat].name}</span></div><p>${m.desc}</p></div></div><div class="demo-actions">${m.exportData ? `<button class="button secondary" data-export-data>${icon("download")}<span>导出数据</span></button>` : ""}<button class="button secondary" data-action="share" title="导出当前模型参数">${icon("share")}<span>导出参数</span></button><button class="button secondary" data-action="save">${icon("save")}<span>保存课堂</span></button><button class="button primary" data-action="present">${icon("fullscreen")}<span id="presentLabel">大屏模式</span></button></div></section><div class="demo-layout model-${m.id} ${m.advanced ? "advanced-layout advanced-" + m.id : ""} ${m.science ? "science-layout science-" + m.id : ""} ${m.threeD ? "geometry-layout geometry-" + m.id : ""}"><div class="demo-left"><section class="canvas-panel" aria-label="互动模型演示"><div class="canvas-toolbar"><div class="status"><span id="simulationStatus">${m.threeD ? "拖动旋转 · 滚轮缩放" : m.time ? "点击播放" : "拖动参数"}</span><button class="mobile-param-jump" data-action="to-params">参数 ↓</button></div><div class="canvas-tools">${m.compare ? `<button class="icon-button" data-action="compare" title="对照曲线" aria-label="保存或清除对照曲线">${icon("compare")}</button><span class="sep"></span>` : ""}<button class="icon-button" id="inkButton" data-action="ink" title="板书 / 自由标注" aria-label="开启板书" aria-pressed="false">${icon("pencil")}</button><button class="icon-button" data-action="clear-ink" title="清空板书" aria-label="清空板书">${icon("trash")}</button><span class="sep"></span><button class="icon-button" data-action="screenshot" title="导出当前模型图片" aria-label="导出当前模型图片">${icon("camera")}</button></div></div>${m.threeD ? geometryToolbar() : ""}<div class="stage ${m.threeD ? "stage-3d" : ""}" id="stage"><canvas id="simCanvas" tabindex="0" role="img" aria-live="off" aria-label="${m.title}动态图。可通过参数滑块或数值输入操作；结果显示在下方。"></canvas><canvas id="annotation" aria-label="课堂板书画布"></canvas><div class="comparison-legend" id="comparisonLegend" hidden><span class="legend-item"><span class="legend-line"></span>当前模型</span><span class="legend-item"><span class="legend-line compare"></span>对照曲线</span></div></div><div class="stage-hint">${m.hint}</div><div class="formula-bar"><div><div class="formula-text" id="formula"></div><div class="formula-caption" id="formulaCaption"></div></div></div><div class="playback">${m.threeD ? geometryPlayback() : standardPlayback(m)}</div></section><div class="metrics" id="metrics" aria-live="off"></div><details class="model-question"><summary>讨论问题</summary><p>${m.question}</p><button data-action="answer" id="answerButton">查看解答</button><p class="answer" id="answerText" hidden>${m.answer}</p></details></div><aside class="control-panel" id="controlPanel" aria-label="模型参数"><div class="control-heading">参数<button class="mobile-stage-jump" data-action="to-model">回到模型 ↑</button></div><div class="control-body" id="controlBody"></div></aside></div>`;
+    `<section class="demo-header"><div class="demo-heading"><button class="icon-button back-button" data-action="home" aria-label="返回模型库">${icon("back")}</button><div><div class="demo-title-row"><h1>${m.title}</h1><span class="demo-tag ${m.cat}">${CATS[m.cat].name}</span></div><p>${m.desc}</p></div></div><div class="demo-actions">${m.exportData ? `<button class="button secondary" data-export-data>${icon("download")}<span>导出数据</span></button>` : ""}<button class="button secondary" data-action="share" title="导出当前模型参数">${icon("share")}<span>导出参数</span></button><button class="button secondary" data-action="save">${icon("save")}<span>保存课堂</span></button><button class="button primary" data-action="present">${icon("fullscreen")}<span id="presentLabel">大屏模式</span></button></div></section><div class="demo-layout model-${m.id} ${m.advanced ? "advanced-layout advanced-" + m.id : ""} ${m.science ? "science-layout science-" + m.id : ""} ${m.threeD ? "geometry-layout geometry-" + m.id : ""}"><div class="demo-left"><section class="canvas-panel" aria-label="互动模型演示"><div class="canvas-toolbar"><div class="status"><span id="simulationStatus">${m.threeD ? "拖动旋转 · 滚轮缩放" : m.time ? "点击播放" : "拖动参数"}</span><button class="mobile-param-jump" data-action="to-params">参数 ↓</button></div><div class="canvas-tools">${m.compare ? `<button class="icon-button" data-action="compare" title="对照曲线" aria-label="保存或清除对照曲线">${icon("compare")}</button><span class="sep"></span>` : ""}<button class="icon-button" id="inkButton" data-action="ink" title="板书 / 自由标注" aria-label="开启板书" aria-pressed="false">${icon("pencil")}</button><button class="icon-button" data-action="clear-ink" title="清空板书" aria-label="清空板书">${icon("trash")}</button><span class="sep"></span><button class="icon-button" data-action="screenshot" title="导出当前模型图片" aria-label="导出当前模型图片">${icon("camera")}</button></div></div>${m.threeD && m.geometryUI !== false ? geometryToolbar() : ""}<div class="stage ${m.threeD ? "stage-3d" : ""}" id="stage"><canvas id="simCanvas" tabindex="0" role="img" aria-live="off" aria-label="${m.title}动态图。可通过参数滑块或数值输入操作；结果显示在下方。"></canvas><canvas id="annotation" aria-label="课堂板书画布"></canvas><div class="comparison-legend" id="comparisonLegend" hidden><span class="legend-item"><span class="legend-line"></span>当前模型</span><span class="legend-item"><span class="legend-line compare"></span>对照曲线</span></div></div><div class="stage-hint">${m.hint}</div><div class="formula-bar"><div><div class="formula-text" id="formula"></div><div class="formula-caption" id="formulaCaption"></div></div></div><div class="playback">${m.threeD && m.geometryUI !== false ? geometryPlayback() : standardPlayback(m)}</div></section><div class="metrics" id="metrics" aria-live="off"></div><details class="model-question"><summary>讨论问题</summary><p>${m.question}</p><button data-action="answer" id="answerButton">查看解答</button><p class="answer" id="answerText" hidden>${m.answer}</p></details></div><aside class="control-panel" id="controlPanel" aria-label="模型参数"><div class="control-heading">参数<button class="mobile-stage-jump" data-action="to-model">回到模型 ↑</button></div><div class="control-body" id="controlBody"></div></aside></div>`;
   if (activeQuestion) {
     $(".demo-header").insertAdjacentHTML("afterend", questionContextHTML());
     const back = $(".back-button");
@@ -679,7 +682,9 @@ function renderReadout() {
   if (state.model.science) updateScienceNotice();
   if ($("#timeLabel"))
     $("#timeLabel").textContent =
-      state.model.id === "collision"
+      state.model.playback
+        ? state.model.playback.formatTime(state.time, state.p)
+        : state.model.id === "collision"
         ? `${collisionNumber(state.time)} s`
         : state.model.id === "seasons"
           ? `λ = ${num(state.p.phase, 1)}°`
@@ -696,7 +701,7 @@ function renderReadout() {
   if (state.model.id === "seasons") syncParam("phase");
   if (state.model.id === "solar") syncParam("hour");
   if (state.model.id === "trig") syncParam("angle");
-  if (state.model.threeD) geometrySyncView();
+  if (state.model.threeD && state.model.geometryUI !== false) geometrySyncView();
 }
 function syncParam(key) {
   const range = $(`#range-${key}`),
@@ -709,7 +714,7 @@ function syncParam(key) {
     number.value =
       state.model?.id === "seasons" && key === "phase"
         ? num(state.p[key], 4)
-        : state.model?.id === "spring" ||
+        : state.model?.keepNumericPrecision || state.model?.id === "spring" ||
             state.model?.id === "derivative" ||
             state.model?.science
           ? String(state.p[key])
@@ -750,7 +755,7 @@ function frame(now) {
   pendingFrame = 0;
   if (state.running && state.model) {
     const dt = Math.min((now - (prevFrame || now)) / 1000, 0.04) * state.speed;
-    if (dt > 0) updateSimulation(dt);
+    if (dt > 0) updateSimulation(dt * (state.model.playback?.rate?.(state.p) ?? 1));
   }
   prevFrame = now;
   if (state.model) {
@@ -768,7 +773,7 @@ function stopAnimation() {
   state.geoFold = false;
   prevFrame = 0;
   updatePlayback();
-  if (state.model?.threeD) geometrySyncView();
+  if (state.model?.threeD && state.model.geometryUI !== false) geometrySyncView();
 }
 function updatePlayback() {
   const b = $("#playButton");
@@ -780,7 +785,7 @@ function updatePlayback() {
     $("#simulationStatus").textContent =
       state.model.id === "circular" && state.circular?.slack
         ? "绳松弛，已停止"
-        : ["collision", "induction"].includes(state.model.id) &&
+        : (state.model.playback || ["collision", "induction"].includes(state.model.id)) &&
             state.time >= playbackDuration()
           ? "演示结束"
           : state.running
@@ -792,6 +797,9 @@ function updatePlayback() {
 }
 function togglePlay() {
   if (!state.model?.time) return;
+  const validity = state.model.validate?.(state.p);
+  if (validity && !validity.valid) { toast(validity.message); return; }
+  if (state.model.playback && state.time >= playbackDuration()) state.time = 0;
   if (state.model.id === "circular" && state.circular?.slack) {
     updateScienceNotice();
     return;
@@ -953,8 +961,10 @@ function makePlot(ctx, w, h, options = {}) {
     y = (v) => h - bottom - ((v - ymin) / (ymax - ymin)) * ph,
     ix = (v) => xmin + ((v - left) / pw) * (xmax - xmin),
     iy = (v) => ymin + ((h - bottom - v) / ph) * (ymax - ymin),
-    sx = niceStep((xmax - xmin) / 14),
-    sy = equal ? sx : niceStep((ymax - ymin) / 7),
+    preciseTicks = options.preciseTicks ?? !!state.model?.university,
+    sx = niceStep((xmax - xmin) / (preciseTicks ? Math.max(3, pw / 55) : 14)),
+    sy = equal ? sx : niceStep((ymax - ymin) / (preciseTicks ? Math.max(3, ph / 48) : 7)),
+    tick = (v) => preciseTicks ? (Math.abs(v) < 1e-14 ? "0" : String(Number(v.toPrecision(4)))) : num(v, 1),
     ox = x(0),
     oy = y(0);
   ctx.save();
@@ -962,31 +972,31 @@ function makePlot(ctx, w, h, options = {}) {
   ctx.rect(left, top, pw, ph);
   ctx.clip();
   if (grid) {
-    for (let v = Math.ceil(xmin / sx) * sx; v <= xmax + 1e-7; v += sx)
+    for (let v = Math.ceil(xmin / sx) * sx; v <= xmax + (preciseTicks ? sx * 1e-6 : 1e-7); v += sx)
       line(ctx, x(v), top, x(v), h - bottom, PALETTE.grid, 1);
-    for (let v = Math.ceil(ymin / sy) * sy; v <= ymax + 1e-7; v += sy)
+    for (let v = Math.ceil(ymin / sy) * sy; v <= ymax + (preciseTicks ? sy * 1e-6 : 1e-7); v += sy)
       line(ctx, left, y(v), w - right, y(v), PALETTE.grid, 1);
   }
   line(ctx, left, oy, w - right, oy, PALETTE.axis, 1);
   line(ctx, ox, top, ox, h - bottom, PALETTE.axis, 1);
   ctx.restore();
   if (labels) {
-    for (let v = Math.ceil(xmin / sx) * sx; v <= xmax + 1e-7; v += sx)
-      if (Math.abs(v) > 1e-7)
+    for (let v = Math.ceil(xmin / sx) * sx; v <= xmax + (preciseTicks ? sx * 1e-6 : 1e-7); v += sx)
+      if (Math.abs(v) > (preciseTicks ? 1e-14 : 1e-7))
         text(
           ctx,
-          num(v, 1),
+          tick(v),
           x(v),
           clamp(oy + 14, top + 11, h - bottom + 14),
           9,
           "#a3ae99",
           "center",
         );
-    for (let v = Math.ceil(ymin / sy) * sy; v <= ymax + 1e-7; v += sy)
-      if (Math.abs(v) > 1e-7)
+    for (let v = Math.ceil(ymin / sy) * sy; v <= ymax + (preciseTicks ? sy * 1e-6 : 1e-7); v += sy)
+      if (Math.abs(v) > (preciseTicks ? 1e-14 : 1e-7))
         text(
           ctx,
-          num(v, 1),
+          tick(v),
           clamp(ox - 9, left + 19, w - right - 5),
           y(v),
           9,
@@ -1602,6 +1612,7 @@ function exportMathImage() {
 function exportImage() {
   if (!state.model) return;
   if (
+    state.model.university ||
     state.model.advanced ||
     state.model.science ||
     state.model.threeD ||
@@ -1755,7 +1766,7 @@ function action(name) {
     case "step":
       if (state.model?.time) {
         stopAnimation();
-        updateSimulation(0.05);
+        updateSimulation(state.model.playback?.step(state.p) ?? 0.05);
         renderReadout();
         requestDraw();
       }
@@ -1768,7 +1779,7 @@ function action(name) {
         state.compare = null;
         state.strokes = [];
         resetSolver();
-        if (state.model.threeD) geometrySyncView();
+        if (state.model.threeD && state.model.geometryUI !== false) geometrySyncView();
         renderControls();
         renderReadout();
         requestDraw();
@@ -1891,7 +1902,7 @@ document.addEventListener("click", (e) => {
     renderControls();
     $(`[data-preset="${b.dataset.preset}"]`)?.classList.add("active");
     renderReadout();
-    if (["collision", "induction"].includes(state.model.id)) updatePlayback();
+    if (state.model.playback || ["collision", "induction"].includes(state.model.id)) updatePlayback();
     requestDraw();
     return;
   }
@@ -1946,10 +1957,11 @@ document.addEventListener("input", (e) => {
     setParam(el.dataset.param, Number(el.value));
   } else if (
     el.id === "timeline" &&
-    ["projectile", "collision", "induction"].includes(state.model?.id)
+    (state.model?.playback || ["projectile", "collision", "induction"].includes(state.model?.id))
   ) {
     stopAnimation();
     state.time = (Number(el.value) / 1000) * playbackDuration();
+    state.model.playback?.seek?.(state.time);
     renderReadout();
     updatePlayback();
     requestDraw();
@@ -2004,11 +2016,12 @@ document.addEventListener("keydown", (e) => {
   if (
     document.activeElement?.id === "timeline" &&
     ["Home", "End"].includes(e.key) &&
-    ["projectile", "collision", "induction"].includes(state.model?.id)
+    (state.model?.playback || ["projectile", "collision", "induction"].includes(state.model?.id))
   ) {
     e.preventDefault();
     stopAnimation();
     state.time = e.key === "Home" ? 0 : playbackDuration();
+    state.model.playback?.seek?.(state.time);
     renderReadout();
     updatePlayback();
     requestDraw();
@@ -2150,7 +2163,7 @@ document.addEventListener("click", (e) => {
     setActiveNav();
     renderCards();
   }
-  if (b.dataset.geoView && state.model?.threeD) {
+  if (b.dataset.geoView && state.model?.threeD && state.model.geometryUI !== false) {
     geoStop();
     const v = {
       iso: [-35, state.model.id === "nets" ? 38 : 24],
@@ -2174,7 +2187,7 @@ document.addEventListener("change", (e) => {
     setActiveNav();
     renderCards();
   }
-  if (el.dataset.geoSelect && state.model?.threeD) {
+  if (el.dataset.geoSelect && state.model?.threeD && state.model.geometryUI !== false) {
     const k = el.dataset.geoSelect;
     if (state.model.choices?.[k]?.includes(el.value)) {
       geoStop();
@@ -2185,7 +2198,7 @@ document.addEventListener("change", (e) => {
       requestDraw();
     }
   }
-  if (el.dataset.geoToggle && state.model?.threeD) {
+  if (el.dataset.geoToggle && state.model?.threeD && state.model.geometryUI !== false) {
     const k = el.dataset.geoToggle;
     if (state.model.bools?.includes(k)) {
       state.p[k] = el.checked;

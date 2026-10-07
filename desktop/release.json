@@ -1,15 +1,29 @@
 {
   "schema": 1,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "shellVersion": "1.1.0",
   "minimumShellVersion": "1.1.0",
-  "publishedAt": "2026-10-03",
+  "publishedAt": "2026-10-07",
   "manifestURL": "https://zhixiang-classroom.pages.dev/desktop/latest.json",
   "websiteURL": "https://zhixiang-classroom.pages.dev/",
   "repository": "Jasoniss8/zhixiang-classroom",
-  "notes": ["加入桌面版检查更新与网站下载页。", "包含 22 个教学模型、课堂分享、投屏设置及 CSV / SVG 导出。"],
+  "notes": [
+    "新增泰勒展开、线性变换、傅里叶级数、偏导与梯度、一阶微分方程、串联RLC六个大学模型。",
+    "做题入口新增六类有限文本识别与固定计算步骤，支持核对条件和变式对照。",
+    "共28个模型；保留离线使用、v1课堂配置、分享、投屏和曲线导出。"
+  ],
   "downloads": {
-    "macos": {"label": "macOS", "architecture": "Apple 芯片（M1 及更新）", "minimumOS": "macOS 13 或更新", "filename": "Zhixiang-macOS-arm64.zip"},
-    "windows": {"label": "Windows", "architecture": "x64", "minimumOS": "Windows 10 / 11（64 位）", "filename": "Zhixiang-Windows-x64.zip"}
+    "macos": {
+      "label": "macOS",
+      "architecture": "Apple 芯片（M1 及更新）",
+      "minimumOS": "macOS 13 或更新",
+      "filename": "Zhixiang-macOS-arm64.zip"
+    },
+    "windows": {
+      "label": "Windows",
+      "architecture": "x64",
+      "minimumOS": "Windows 10 / 11（64 位）",
+      "filename": "Zhixiang-Windows-x64.zip"
+    }
   }
 }

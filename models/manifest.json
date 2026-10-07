@@ -20,5 +20,11 @@
   "collision",
   "circular",
   "electric",
-  "seasons"
+  "seasons",
+  "taylor",
+  "linear-transform",
+  "fourier",
+  "gradient",
+  "ode",
+  "rlc"
 ]

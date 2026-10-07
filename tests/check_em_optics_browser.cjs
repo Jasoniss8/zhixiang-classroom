@@ -9,7 +9,7 @@ const check=(name,passed,details)=>{results.push({name,passed:!!passed,details})
  const context=await browser.newContext({viewport:{width:1440,height:1050},acceptDownloads:true}),page=await context.newPage();
  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url())&&!r.url().startsWith((require('./runtime.cjs').baseURL + '/')))remote.push(r.url());});
  await page.goto((require('./runtime.cjs').baseURL + '/index.html?qa=em-optics'));
- check('22 个模型、物理 12 个，首页结构保留',await page.locator('.model-card').count()===22&&await page.locator('[data-category=physics] small').innerText()==='12');
+ check('28 个模型、物理 13 个，首页结构保留',await page.locator('.model-card').count()=== 28&&await page.locator('[data-category=physics] small').innerText()==='13');
  const draw=async()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  const fill=async(key,value)=>{await page.locator('#number-'+key).fill(String(value));await page.locator('#number-'+key).press('Tab');await draw();};
  const metric=async label=>page.evaluate(label=>[...document.querySelectorAll('.metric')].find(e=>e.querySelector('span').textContent===label)?.querySelector('strong').textContent,label);

@@ -382,7 +382,7 @@ function svgForChart(chart, title, metadata = {}) {
 
   const x = (v) => left + ((v - xmin) / (xmax - xmin)) * (right - left),
     y = (v) => bottom - ((v - ymin) / (ymax - ymin)) * (bottom - top);
-  let content = `<rect width="1000" height="650" fill="white"/><text x="45" y="40" font-size="23" fill="#173629">${esc(title + " · " + chart.name)}</text><text x="45" y="69" font-size="14" fill="#46534c">${esc(`导出时刻 t=${num(metadata.time || 0, 4)} s；${chart.rows.length} 行。空值处断开。`)}</text>`;
+  let content = `<rect width="1000" height="650" fill="white"/><text x="45" y="40" font-size="23" fill="#173629">${esc(title + " · " + chart.name)}</text><text x="45" y="69" font-size="14" fill="#46534c">${esc(`${metadata.timed ? "导出时刻 t=" + num(metadata.time || 0, 4) + " s；" : ""}${chart.rows.length} 行。空值处断开。`)}</text>`;
   for (let i = 0; i <= 5; i++) {
     const xx = left + ((right - left) * i) / 5,
       yy = bottom - ((bottom - top) * i) / 5;
@@ -436,6 +436,7 @@ function exportDataDialog() {
     model: state.model.id,
     title: state.model.title,
     time: state.time,
+    timed: !!state.model.time,
     params: { ...state.p },
     comparison: state.compare && { ...state.compare },
     date: new Date().toISOString(),

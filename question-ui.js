@@ -9,6 +9,13 @@ function questionType(id) {
 function questionMessages(messages, className = "") {
   return messages.length ? `<ul class="question-messages ${className}">${messages.map((message) => `<li>${esc(message)}</li>`).join("")}</ul>` : "";
 }
+function questionFields(typeId, values) {
+  return ZhixiangQuestions.fieldsFor(typeId, values);
+}
+function questionStepsHTML(typeId, values) {
+  const rows = ZhixiangQuestions.steps(typeId, values);
+  return rows.length ? `<div class="question-calculation"><h2>固定计算步骤</h2><p class="question-help">按当前模型条件计算；修改参数后步骤同步更新，并标明变式。</p><ol class="question-calculation-steps">${rows.map(row => `<li><h3>${esc(row.title)}</h3>${[row.formula,row.substitution,row.result].filter(Boolean).map(line => `<p>${esc(line)}</p>`).join("")}</li>`).join("")}</ol></div>` : "";
+}
 function renderQuestionPage() {
   const limit = ZhixiangQuestions.MAX_TEXT_LENGTH || 4000;
   $("#main").innerHTML = mobileNav() + `
@@ -24,7 +31,7 @@ function renderQuestionPage() {
             <label class="question-label" for="questionType">题型</label>
             <select id="questionType" class="control-select"><option value="auto">自动匹配</option>${ZhixiangQuestions.types.map((type) => `<option value="${esc(type.id)}" ${questionDraft.type === type.id ? "selected" : ""}>${esc(type.title)}</option>`).join("")}</select>
             <button type="submit" class="button primary" id="matchQuestion">${icon("search")}匹配模型</button>
-            <p class="question-help" id="questionInputNote">支持下方四类文本题，可手动补充未识别的条件。图片识别暂未接入。题目不上传，仅保留在当前页面，刷新后清空。</p>
+            <p class="question-help" id="questionInputNote">支持下方列出的文本题，可手动补充未识别的条件。图片识别暂未接入。题目不上传，仅保留在当前页面，刷新后清空。</p>
             <p class="question-help" id="questionImportStatus" role="status"></p>
           </form>
           <div class="question-examples"><h2>试一道例题</h2><div>${ZhixiangQuestions.types.map((type) => `<button class="button secondary small" data-question-example="${esc(type.id)}">${esc(type.title)}</button>`).join("")}</div></div>
@@ -48,21 +55,22 @@ function renderQuestionResult() {
   target.innerHTML = `<div class="question-result-heading"><div><p class="question-eyebrow">匹配模型</p><h2>${esc(modelById(type.modelId)?.title || type.title)}</h2></div><span class="question-step">核对条件</span></div>
     ${result.asked ? `<p class="question-asked"><strong>题目所求：</strong>${esc(result.asked)}</p>` : ""}
     ${questionMessages(result.issues || [], "question-errors")}
-    <div class="question-fields">${type.fields.map((field) => {
+    <div class="question-fields">${questionFields(type.id, questionDraft.values).map((field) => {
       const value = questionDraft.values[field.key] ?? "";
       const inputId = "question-field-" + field.key;
       const source = result.sources?.[field.key];
-      return `<div class="question-field"><label for="${esc(inputId)}">${esc(field.label)}${field.unit ? `<span> / ${esc(field.unit)}</span>` : ""}</label>${field.type === "select"
-        ? `<select id="${esc(inputId)}" data-question-field="${esc(field.key)}"><option value="">请选择</option>${field.options.map((option) => `<option value="${esc(option.value)}" ${String(value) === String(option.value) ? "selected" : ""}>${esc(option.label)}</option>`).join("")}</select>`
+      return `<div class="question-field"><label for="${esc(inputId)}">${esc(field.label)}${field.optional ? "（可选）" : ""}${field.unit ? `<span> / ${esc(field.unit)}</span>` : ""}</label>${field.type === "select"
+        ? `<select id="${esc(inputId)}" data-question-field="${esc(field.key)}" ${field.readOnly ? 'disabled aria-describedby="question-source-' + esc(field.key) + '"' : ""}><option value="">请选择</option>${field.options.map((option) => `<option value="${esc(option.value)}" ${String(value) === String(option.value) ? "selected" : ""}>${esc(option.label)}</option>`).join("")}</select>`
         : `<input id="${esc(inputId)}" data-question-field="${esc(field.key)}" type="number" step="any" ${Number.isFinite(field.min) ? `min="${field.min}"` : ""} ${Number.isFinite(field.max) ? `max="${field.max}"` : ""} value="${esc(value)}" placeholder="请按原题补充">`}
-        <small id="question-source-${esc(field.key)}">${source ? "识别依据：" + esc(source) : "未从题干识别，请核对后填写。"}</small></div>`;
+        <small id="question-source-${esc(field.key)}">${source ? "识别依据：" + esc(source) : field.optional ? "题干未给出，可留空；演示默认值会单独说明。" : "未从题干识别，请核对后填写。"}</small></div>`;
     }).join("")}</div>
     ${questionMessages(result.warnings || [], "question-notes")}
     <div id="questionModelNotes">${questionMessages(checked.notes || [], "question-notes")}</div>
+    <div id="questionStepPreview"></div>
     <div id="questionValidation" class="question-validation" role="status"></div>
     <label class="question-confirm"><input type="checkbox" id="questionConfirm">我已核对数值、单位与假设，确认与这道题一致。</label>
     <button class="button primary" id="openQuestionModel" disabled>进入模型 ${icon("arrow")}</button>
-    <p class="question-help">这里匹配已有模型。进入后可查看公式与读数，不自动生成任意题目的完整解答。</p>`;
+    <p class="question-help">这里匹配已有模型。大学限定题型提供固定计算步骤，不处理任意证明或组合题。</p>`;
   updateQuestionValidation();
 }
 function updateQuestionValidation() {
@@ -72,6 +80,7 @@ function updateQuestionValidation() {
   const issues = result.issues || [];
   $("#questionValidation").innerHTML = questionMessages(checked.errors || [], "question-errors");
   $("#questionModelNotes").innerHTML = questionMessages(checked.notes || [], "question-notes");
+  $("#questionStepPreview").innerHTML = checked.ok && !issues.length ? questionStepsHTML(result.typeId, questionDraft.values) : "";
   $("#openQuestionModel").disabled = !checked.ok || !!issues.length || !$("#questionConfirm").checked;
 }
 function matchQuestion() {
@@ -105,21 +114,46 @@ function questionContextHTML() {
   return `<section id="questionContext" class="question-context" aria-label="当前题目"><div class="question-context-heading"><h2>当前题目</h2><div><button id="questionEdit" class="button secondary small">修改题目</button><button id="questionOriginal" class="button secondary small">还原题目条件</button></div></div>
     <p class="question-original-text">${esc(question.text)}</p>
     ${question.asked ? `<p class="question-asked"><strong>题目所求：</strong>${esc(question.asked)}</p>` : ""}
-    <dl class="question-known">${type.fields.map((field) => {
+    <dl class="question-known">${questionFields(type.id, question.values).filter(field => question.values[field.key] !== undefined && question.values[field.key] !== "").map((field) => {
       const raw = question.values[field.key];
       const value = field.type === "select" ? field.options.find((option) => String(option.value) === String(raw))?.label : raw;
       return `<div><dt>${esc(field.label)}</dt><dd>${esc(value)}${field.unit ? " " + esc(field.unit) : ""}</dd></div>`;
     }).join("")}</dl>
+    <div id="questionSteps">${questionStepsHTML(type.id, question.values)}</div>
     <details class="question-context-notes"><summary>核对说明与模型范围</summary>${questionMessages(question.notes)}<p>保存课堂与分享链接仅含模型参数，不包含原题。下方讨论问题是模型通用问题。</p></details>
     <p id="questionVariation" class="question-variation" role="status">当前使用已核对的题目条件。</p></section>`;
+}
+function currentQuestionValues(question) {
+  const id = question.typeId, current = { ...question.values };
+  // A different surface/circuit mode is outside this fixed question template.
+  if (id === "gradient" && state.p.surface !== "quadratic" || id === "rlc" && state.p.mode !== "steady") return null;
+  for (const field of questionFields(id, { ...current, ...state.p })) {
+    if (field.parameter === false || field.key === "probe" && !Object.hasOwn(question.values, "probe")) continue;
+    if (Object.hasOwn(state.p, field.key)) current[field.key] = state.p[field.key];
+  }
+  if (id === "ode") {
+    current.span = state.p.span;
+    if (Object.hasOwn(question.values, "target")) current.target = state.p.t0 + state.p.span;
+  }
+  if (id === "rlc") current.voltageValue = state.p.driveVoltage / (current.voltageKind === "rms" ? Math.SQRT2 : 1);
+  return current;
 }
 function updateQuestionVariation() {
   const target = $("#questionVariation");
   if (!activeQuestion || !target) return;
-  const changed = Object.keys(activeQuestion.originalParams || {}).some((key) => state.p[key] !== activeQuestion.originalParams[key]);
-  const message = changed ? "当前为变式：模型参数已调整，与上方题目条件不同。可点击「还原题目条件」。" : "当前使用已核对的题目条件。";
+  const changed = ZhixiangQuestions.variationKeys(activeQuestion.typeId, activeQuestion.values, activeQuestion.originalParams).some((key) => state.p[key] !== activeQuestion.originalParams[key]);
+  const message = changed ? "当前为变式：模型参数已调整，计算步骤已按当前条件更新。上方原题不变，可点击「还原题目条件」。" : "当前使用已核对的题目条件。";
   if (target.textContent !== message) target.textContent = message;
   target.classList.toggle("is-variation", changed);
+  if (questionType(activeQuestion.typeId)?.university) {
+    const values = changed ? currentQuestionValues(activeQuestion) : activeQuestion.values;
+    const steps = $("#questionSteps");
+    const signature = JSON.stringify(values);
+    if (steps && steps.dataset.conditions !== signature) {
+      steps.dataset.conditions = signature;
+      steps.innerHTML = values ? questionStepsHTML(activeQuestion.typeId, values) : '<p class="question-help">当前模式超出本题固定计算模板；请还原题目条件或修改题目。</p>';
+    }
+  }
 }
 function invalidateQuestionResult() {
   questionDraft.revision++;
@@ -166,7 +200,8 @@ document.addEventListener("input", (event) => {
     $("#questionConfirm").checked = false;
     const source = $("#question-source-" + key);
     if (source) source.textContent = "已手动修改，请再次核对原题。";
-    updateQuestionValidation();
+    if (input.tagName === "SELECT") renderQuestionResult();
+    else updateQuestionValidation();
   }
 });
 document.addEventListener("change", async (event) => {
