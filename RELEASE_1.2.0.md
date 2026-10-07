@@ -22,6 +22,7 @@
 | `styles.css` | 新模型画布尺寸、手机排布、例题/固定步骤；未重做首页。 |
 | `tests/check_university_*.cjs` | 数值、严格题解析、浏览器、实际下载及离线回归。 |
 | `tests/smoke_university_desktop.cjs`、`.github/workflows/test.yml` | Windows CI启动实际打包exe，用隔离数据验证28模型、控件、保存和离线依赖。 |
+| `windows/build.py` | 构建日志使用UTF-8，避免英文Windows环境输出中文程序路径时打包已完成却因编码报错。 |
 | `tests/verify_university_live.cjs`、`verify_university_update.cjs` | 发布后的匿名网站/资产核验及隔离真实更新检查；结果单独记录，不纳入本地2000项。 |
 | `tests/smoke_electron_update.cjs` | 根据内容版本生成下一补丁测试版本，验证更新/校验失败保留/离线重启。 |
 | 现有`tests/check_*.cjs`、`README.md`、本文件 | 更新数量断言，独立旧22清单、回归说明及模型使用范围。 |
@@ -35,6 +36,8 @@
 本机浏览器为macOS上的Chrome；390px为视口模拟。Electron更新测试在macOS上实际运行主进程/预加载/页面，以临时数据隔离，发布服务及原生确认选择为测试替身。Windows实际exe由GitHub Windows runner检查，不能视为Windows物理真机或手机真机结果。macOS窗口和线上真实更新流另行记录。
 
 首次全量1882项中1881通过：唯一失败为旧示例计数仍断言4，已改10；该轮不是最终全通过记录。完整新一轮回归26组2000/2000通过，0失败、0环境错误，服务器已关闭；报告`output/playwright/run-20261007T021932.375786Z/summary.json`。其中大学纯数学58/58、大学动态数值/导出113/113、大学题解析139/139、新模型浏览器76/76、大学做题浏览器93/93。另`tests/smoke_electron_update.cjs`实际22/22通过，报告`output/playwright/university-electron-update/electron-update-smoke-results.json`。独立审阅25个定点题解析检查通过。最终单文件846,456 B。macOS原生窗口已核对28模型首页、梯度曲面、版本页及RLC单步同步，记录`output/playwright/university-native-macos/manual-results.json`；不等同于原生全部操作的完整回归。
+
+首轮Windows CI在ZIP生成后输出中文路径时因cp1252编码失败，程序启动检查未运行；已改构建日志为UTF-8，最终以修复提交的CI结果为准。该修复不改变页面和程序内容。
 
 ## 发布与安装
 

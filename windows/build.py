@@ -21,6 +21,11 @@ PACKAGER = WINDOWS / 'node_modules' / '@electron' / 'packager' / 'bin' / 'electr
 
 
 def main() -> None:
+    # Windows CI may use a legacy pipe encoding. Paths include the Chinese app
+    # name, so writing a successful build message must also support Unicode.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8')
     if not PACKAGER.is_file():
         raise SystemExit('Build tool missing. Run: npm install --prefix windows')
 
